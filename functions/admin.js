@@ -546,30 +546,25 @@ export async function onRequest(context) {
       if (action === 'addVideo') {
         var userId = body.userId;
         var platformId = body.platformId;
-        var videoId = body.videoId;
+        var videoId = body.newVideoId; // 修复：前端发送的是 newVideoId
         var title = body.title;
-        var imageUrl = body.imageUrl || "";        // 允许空字符串
-        var affiliateLink = body.affiliateLink || ""; // 允许空字符串
+        var imageUrl = body.imageUrl || "";
+        var affiliateLink = body.affiliateLink || "";
 
-        // 仅必需参数检查
         if (!userId || !platformId || !videoId || !title) {
           throw new Error('缺少必要参数（userId, platformId, videoId, title）');
         }
-
         if (!data.accounts[userId] || !data.accounts[userId].platforms[platformId]) {
           throw new Error('平台不存在');
         }
-
         if (data.accounts[userId].platforms[platformId].videos[videoId]) {
           throw new Error('视频ID已存在');
         }
-
         data.accounts[userId].platforms[platformId].videos[videoId] = {
           title: title,
           imageUrl: imageUrl,
           affiliateLink: affiliateLink
         };
-
         await saveDataToKV(env, data);
         return jsonResponse({ ok: true });
       }
@@ -578,39 +573,30 @@ export async function onRequest(context) {
         var oldVideoId = body.oldVideoId;
         var newVideoId = body.newVideoId;
         var title = body.title;
-        var imageUrl = body.imageUrl || "";  // 允许空字符串
-        var affiliateLink = body.affiliateLink || "";  // 允许空字符串
+        var imageUrl = body.imageUrl || "";
+        var affiliateLink = body.affiliateLink || "";
 
         if (!oldVideoId || !newVideoId || !title) {
-          return new Response(JSON.stringify({ ok: false, error: '缺少必要参数' }), { headers: { 'Content-Type': 'application/json' } });
+          return jsonResponse({ ok: false, error: '缺少必要参数' });
         }
-
-        // 检查平台是否存在
         if (!data.accounts[body.userId] || !data.accounts[body.userId].platforms[body.platformId] || !data.accounts[body.userId].platforms[body.platformId].videos) {
-          return new Response(JSON.stringify({ ok: false, error: '用户或平台或视频为空' }), { headers: { 'Content-Type': 'application/json' } });
+          return jsonResponse({ ok: false, error: '用户或平台或视频为空' });
         }
         var platform = data.accounts[body.userId].platforms[body.platformId];
 
-        // 如果修改了videoId
         if (oldVideoId !== newVideoId) {
-          // 检查新ID是否已存在（且不是自己）
           if (platform.videos[newVideoId] && oldVideoId !== newVideoId) {
-            return new Response(JSON.stringify({ ok: false, error: '新视频ID已存在，请使用其他ID' }), { headers: { 'Content-Type': 'application/json' } });
+            return jsonResponse({ ok: false, error: '新视频ID已存在，请使用其他ID' });
           }
-          // 删除旧记录
           delete platform.videos[oldVideoId];
         }
-
-        // 保存新记录
         platform.videos[newVideoId] = {
           title: title,
           imageUrl: imageUrl,
           affiliateLink: affiliateLink
         };
-
-        // 更新KV
-        await updateKV(data);
-        return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
+        await saveDataToKV(env, data);  // 修复：使用正确的保存函数
+        return jsonResponse({ ok: true });
       }
 
       if (action === 'deleteVideo') {
