@@ -288,18 +288,18 @@ function renderVideoListHtml(data, userId, platformId) {
 
   html += '</div>';
 
-  // 模态框 HTML（添加和编辑共用一个）
+  // 模态框（添加/编辑通用，ID输入框始终显示）
   html += '<div id="videoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">' +
     '<div style="background:white; border-radius:8px; padding:24px; max-width:500px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
       '<h3 id="modalTitle">添加视频</h3>' +
-      '<input type="hidden" id="modalVideoId" />' +
+      '<input type="hidden" id="modalOldVideoId" />' +   // 保存原ID（用于编辑时键变更）
       '<input type="hidden" id="modalUserId" />' +
       '<input type="hidden" id="modalPlatformId" />' +
       '<div style="margin-bottom:12px;"><label>视频ID</label><input type="text" id="modalVideoIdInput" placeholder="如 V001" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
       '<div style="margin-bottom:12px;"><label>标题</label><input type="text" id="modalTitleInput" placeholder="请输入视频标题" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
-      '<div style="margin-bottom:12px;"><label>图片URL</label><input type="text" id="modalImageUrlInput" placeholder="https://example.com/thumbnail.jpg" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" oninput="previewImage()" /></div>' +
+      '<div style="margin-bottom:12px;"><label>图片URL <span style="color:#999;">(可选)</span></label><input type="text" id="modalImageUrlInput" placeholder="https://example.com/thumbnail.jpg 或留空" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" oninput="previewImage()" /></div>' +
       '<div style="margin-bottom:12px;" id="previewContainer"><img id="previewImage" style="max-width:200px; max-height:120px; display:none; border-radius:4px;" /></div>' +
-      '<div style="margin-bottom:12px;"><label>推广链接</label><input type="text" id="modalAffiliateLinkInput" placeholder="https://s.click.taobao.com/xxx 或你的联盟链接" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
+      '<div style="margin-bottom:12px;"><label>推广链接 <span style="color:#999;">(可选)</span></label><input type="text" id="modalAffiliateLinkInput" placeholder="https://s.click.taobao.com/xxx 或留空" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
       '<div style="text-align:right; margin-top:16px;">' +
         '<button class="btn danger" onclick="closeModal()" style="margin-right:8px;">取消</button>' +
         '<button class="btn" onclick="saveVideo()">保存</button>' +
@@ -314,31 +314,30 @@ function renderVideoListHtml(data, userId, platformId) {
       'document.getElementById("modalVideoIdInput").value = "";',
       'document.getElementById("modalTitleInput").value = "";',
       'document.getElementById("modalImageUrlInput").value = "";',
-      'document.getElementById("modalAffiliateLinkInput").value = "";',
-      'document.getElementById("modalVideoId").value = "";',
+      // 添加时预设推广链接示例：
+      'document.getElementById("modalAffiliateLinkInput").value = "https://s.click.taobao.com/xxx";',
+      'document.getElementById("modalOldVideoId").value = "";',
       'document.getElementById("modalUserId").value = userId;',
       'document.getElementById("modalPlatformId").value = platformId;',
-      'document.getElementById("modalVideoIdInput").style.display = "block";',
       'document.getElementById("previewImage").style.display = "none";',
       'document.getElementById("videoModal").style.display = "flex";',
     '}',
     'function showEditModal(userId, platformId, videoId, title, imageUrl, affiliateLink) {',
       'document.getElementById("modalTitle").innerText = "编辑视频";',
-      'document.getElementById("modalVideoIdInput").value = videoId;',
+      'document.getElementById("modalVideoIdInput").value = videoId;',  // 显示ID且允许修改
       'document.getElementById("modalTitleInput").value = title;',
       'document.getElementById("modalImageUrlInput").value = imageUrl;',
       'document.getElementById("modalAffiliateLinkInput").value = affiliateLink;',
-      'document.getElementById("modalVideoId").value = videoId;',
+      'document.getElementById("modalOldVideoId").value = videoId;',   // 记住原ID
       'document.getElementById("modalUserId").value = userId;',
       'document.getElementById("modalPlatformId").value = platformId;',
-      'document.getElementById("modalVideoIdInput").style.display = "none";',  // 编辑时不允许改ID
       'if (imageUrl) { document.getElementById("previewImage").src = imageUrl; document.getElementById("previewImage").style.display = "block"; }',
       'document.getElementById("videoModal").style.display = "flex";',
     '}',
     'function closeModal() {',
       'document.getElementById("videoModal").style.display = "none";',
     '}',
-    // 图片预��
+    // 图片预览
     'function previewImage() {',
       'var url = document.getElementById("modalImageUrlInput").value;',
       'if (url && url.startsWith("http")) {',
@@ -348,18 +347,17 @@ function renderVideoListHtml(data, userId, platformId) {
         'document.getElementById("previewImage").style.display = "none";',
       '}',
     '}',
-    // 保存视频（添加或更新）
+    // 保存视频（添加或更新，支持修改ID）
     'async function saveVideo() {',
       'var userId = document.getElementById("modalUserId").value;',
       'var platformId = document.getElementById("modalPlatformId").value;',
-      'var videoId = document.getElementById("modalVideoIdInput").value.trim();',
+      'var oldVideoId = document.getElementById("modalOldVideoId").value;',
+      'var newVideoId = document.getElementById("modalVideoIdInput").value.trim();',
       'var title = document.getElementById("modalTitleInput").value.trim();',
       'var imageUrl = document.getElementById("modalImageUrlInput").value.trim();',
       'var affiliateLink = document.getElementById("modalAffiliateLinkInput").value.trim();',
-      'var editMode = !!document.getElementById("modalVideoId").value;',  // 判断是否为编辑模式
-      'if (editMode) { videoId = document.getElementById("modalVideoId").value; }',  // 编辑时用原ID
-      'if (!videoId || !title) { alert("视频ID和标题不能为空"); return; }',
-      'var action = editMode ? "editVideo" : "addVideo";',
+      'if (!newVideoId || !title) { alert("视频ID和标题不能为空"); return; }',
+      'var action = oldVideoId ? "editVideo" : "addVideo";',
       'var res = await fetch("/admin", {',
         'method: "POST",',
         'headers: {"Content-Type": "application/json"},',
@@ -367,17 +365,18 @@ function renderVideoListHtml(data, userId, platformId) {
           'action: action,',
           'userId: userId,',
           'platformId: platformId,',
-          'videoId: videoId,',
+          'oldVideoId: oldVideoId,',
+          'newVideoId: newVideoId,',
           'title: title,',
-          'imageUrl: imageUrl || "",',
-          'affiliateLink: affiliateLink || ""',
+          'imageUrl: imageUrl,',
+          'affiliateLink: affiliateLink',
         '})',
       '});',
       'var data = await res.json();',
       'if (data.ok) { closeModal(); location.reload(); }',
       'else { alert(data.error); }',
     '}',
-    // 已有的 deleteVideo 保持不变
+    // 删除视频
     'async function deleteVideo(userId, platformId, videoId) {',
       'if (!confirm("确定删除视频 " + videoId + " ？")) return;',
       'var res = await fetch("/admin", {',
@@ -388,10 +387,7 @@ function renderVideoListHtml(data, userId, platformId) {
       'var data = await res.json();',
       'if (data.ok) location.reload(); else alert(data.error);',
     '}',
-    // 点击模态框外部关闭（可选）
-    'document.getElementById("videoModal").addEventListener("click", function(e) {',
-      'if (e.target === this) closeModal();',
-    '});',
+    // 点击背景不再关闭（已移除监听）
   ].join('\n');
 
   return adminPage(html, script);
@@ -548,36 +544,73 @@ export async function onRequest(context) {
 
       // ----- 视频操作 -----
       if (action === 'addVideo') {
-        if (!body.userId || !body.platformId || !body.videoId || !body.title || !body.imageUrl || !body.affiliateLink) {
-          throw new Error('缺少参数');
+        var userId = body.userId;
+        var platformId = body.platformId;
+        var videoId = body.videoId;
+        var title = body.title;
+        var imageUrl = body.imageUrl || "";        // 允许空字符串
+        var affiliateLink = body.affiliateLink || ""; // 允许空字符串
+
+        // 仅必需参数检查
+        if (!userId || !platformId || !videoId || !title) {
+          throw new Error('缺少必要参数（userId, platformId, videoId, title）');
         }
-        if (!data.accounts[body.userId] || !data.accounts[body.userId].platforms[body.platformId]) {
+
+        if (!data.accounts[userId] || !data.accounts[userId].platforms[platformId]) {
           throw new Error('平台不存在');
         }
-        if (data.accounts[body.userId].platforms[body.platformId].videos[body.videoId]) {
+
+        if (data.accounts[userId].platforms[platformId].videos[videoId]) {
           throw new Error('视频ID已存在');
         }
-        data.accounts[body.userId].platforms[body.platformId].videos[body.videoId] = {
-          title: body.title,
-          imageUrl: body.imageUrl,
-          affiliateLink: body.affiliateLink
+
+        data.accounts[userId].platforms[platformId].videos[videoId] = {
+          title: title,
+          imageUrl: imageUrl,
+          affiliateLink: affiliateLink
         };
+
         await saveDataToKV(env, data);
         return jsonResponse({ ok: true });
       }
 
       if (action === 'editVideo') {
-        if (!data.accounts[body.userId] || !data.accounts[body.userId].platforms[body.platformId] ||
-            !data.accounts[body.userId].platforms[body.platformId].videos[body.videoId]) {
-          throw new Error('视频不存在');
+        var oldVideoId = body.oldVideoId;
+        var newVideoId = body.newVideoId;
+        var title = body.title;
+        var imageUrl = body.imageUrl || "";  // 允许空字符串
+        var affiliateLink = body.affiliateLink || "";  // 允许空字符串
+
+        if (!oldVideoId || !newVideoId || !title) {
+          return new Response(JSON.stringify({ ok: false, error: '缺少必要参数' }), { headers: { 'Content-Type': 'application/json' } });
         }
-        data.accounts[body.userId].platforms[body.platformId].videos[body.videoId] = {
-          title: body.title,
-          imageUrl: body.imageUrl,
-          affiliateLink: body.affiliateLink
+
+        // 检查平台是否存在
+        if (!data.accounts[body.userId] || !data.accounts[body.userId].platforms[body.platformId] || !data.accounts[body.userId].platforms[body.platformId].videos) {
+          return new Response(JSON.stringify({ ok: false, error: '用户或平台或视频为空' }), { headers: { 'Content-Type': 'application/json' } });
+        }
+        var platform = data.accounts[body.userId].platforms[body.platformId];
+
+        // 如果修改了videoId
+        if (oldVideoId !== newVideoId) {
+          // 检查新ID是否已存在（且不是自己）
+          if (platform.videos[newVideoId] && oldVideoId !== newVideoId) {
+            return new Response(JSON.stringify({ ok: false, error: '新视频ID已存在，请使用其他ID' }), { headers: { 'Content-Type': 'application/json' } });
+          }
+          // 删除旧记录
+          delete platform.videos[oldVideoId];
+        }
+
+        // 保存新记录
+        platform.videos[newVideoId] = {
+          title: title,
+          imageUrl: imageUrl,
+          affiliateLink: affiliateLink
         };
-        await saveDataToKV(env, data);
-        return jsonResponse({ ok: true });
+
+        // 更新KV
+        await updateKV(data);
+        return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
       }
 
       if (action === 'deleteVideo') {
