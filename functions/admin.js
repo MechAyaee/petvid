@@ -2,7 +2,7 @@
 
 // ========== 全局辅助函数（在 onRequest 之外定义）==========
 
-// ========== XSS防御==========
+// ========== XSS防御 ==========
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;')
@@ -10,6 +10,22 @@ function escapeHtml(str) {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+}
+
+function escapeHtmlAttr(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+}
+
+function escapeJsStr(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r');
 }
 
 function jsonResponse(obj, status = 200) {
@@ -138,8 +154,7 @@ function adminPage(content, extraScript) {
       '@media (max-width: 400px) {' +
         '.card-grid { grid-template-columns: 1fr; }' +
       '}' +
-    '</style>'
-
+    '</style>' +
   '</head>' +
   '<body>' +
     '<div class="container">' +
@@ -172,10 +187,11 @@ function renderUserListHtml(data) {
     for (var i = 0; i < keys.length; i++) {
       var id = keys[i];
       var acc = accounts[id];
+      // 使用 escapeJsStr 保护 onclick 中的字符串参数
       html += '<div class="card">' +
         '<h3>' + escapeHtml(acc.displayName) + ' <small>(' + escapeHtml(id) + ')</small></h3>' +
         '<a href="/admin?path=user/' + encodeURIComponent(id) + '" class="btn">管理平台</a>' +
-        '<button class="btn danger" onclick="deleteUser(\'' + escapeHtml(id) + '\')">删除</button>' +
+        '<button class="btn danger" onclick="deleteUser(\'' + escapeJsStr(id) + '\')">删除</button>' +
       '</div>';
     }
   }
@@ -220,7 +236,7 @@ function renderPlatformListHtml(data, userId) {
     '<div class="toolbar">' +
       '<input type="text" id="newPlatformId" placeholder="平台ID (如 tube)" />' +
       '<input type="text" id="newPlatformDisplayName" placeholder="平台名称" />' +
-      '<button class="btn" onclick="addPlatform(\'' + escapeHtml(userId) + '\')">添加平台</button>' +
+      '<button class="btn" onclick="addPlatform(\'' + escapeJsStr(userId) + '\')">添加平台</button>' +
     '</div>' +
     '<div class="card-grid">';
 
@@ -235,7 +251,7 @@ function renderPlatformListHtml(data, userId) {
       html += '<div class="card">' +
         '<h3>' + escapeHtml(plat.displayName) + ' <small>(' + escapeHtml(id) + ')</small></h3>' +
         '<a href="/admin?path=user/' + encodeURIComponent(userId) + '/platform/' + encodeURIComponent(id) + '" class="btn">管理视频</a>' +
-        '<button class="btn danger" onclick="deletePlatform(\'' + escapeHtml(userId) + '\',\'' + escapeHtml(id) + '\')">删除</button>' +
+        '<button class="btn danger" onclick="deletePlatform(\'' + escapeJsStr(userId) + '\',\'' + escapeJsStr(id) + '\')">删除</button>' +
       '</div>';
     }
   }
@@ -270,7 +286,7 @@ function renderPlatformListHtml(data, userId) {
   return adminPage(html, script);
 }
 
-// ========== 渲染视频列表（改进版） ==========
+// ========== 渲染视频列表（完整修正版） ==========
 function renderVideoListHtml(data, userId, platformId) {
   var user = data.accounts[userId];
   if (!user) return renderUserListHtml(data);
@@ -283,7 +299,7 @@ function renderVideoListHtml(data, userId, platformId) {
       '<a href="/admin?path=user/' + encodeURIComponent(userId) + '">' + escapeHtml(user.displayName) + '</a>' +
     '</div>' +
     '<div class="toolbar">' +
-      '<button class="btn" onclick="showAddModal(\'' + escapeHtml(userId) + '\',\'' + escapeHtml(platformId) + '\')">+ 添加视频</button>' +
+      '<button class="btn" onclick="showAddModal(\'' + escapeJsStr(userId) + '\',\'' + escapeJsStr(platformId) + '\')">+ 添加视频</button>' +
     '</div>' +
     '<div class="card-grid">';
 
@@ -295,22 +311,24 @@ function renderVideoListHtml(data, userId, platformId) {
     for (var i = 0; i < keys.length; i++) {
       var id = keys[i];
       var vid = videos[id];
-      var imgHtml = (vid.imageUrl) ? '<img src="' + escapeHtml(vid.imageUrl) + '" alt="' + escapeHtml(vid.title) + '" style="max-width:160px; border-radius:4px; margin:8px 0;" />' : '<p style="color:#999;">未设置图片</p>';
-      var linkHtml = (vid.affiliateLink) ? '<a href="' + escapeHtml(vid.affiliateLink) + '" target="_blank" style="word-break:break-all;">' + escapeHtml(vid.affiliateLink) + '</a>' : '<span style="color:#999;">未设置推广链接</span>';
+      // 图片标签：src 和 alt 使用 escapeHtmlAttr
+      var imgHtml = (vid.imageUrl) ? '<img src="' + escapeHtmlAttr(vid.imageUrl) + '" alt="' + escapeHtmlAttr(vid.title) + '" style="max-width:160px; border-radius:4px; margin:8px 0;" />' : '<p style="color:#999;">未设置图片</p>';
+      // 链接标签：href 使用 escapeHtmlAttr
+      var linkHtml = (vid.affiliateLink) ? '<a href="' + escapeHtmlAttr(vid.affiliateLink) + '" target="_blank" style="word-break:break-all;">' + escapeHtml(vid.affiliateLink) + '</a>' : '<span style="color:#999;">未设置推广链接</span>';
 
-      // 注意：在按钮 onclick 中传递字符串时，需要转义单引号。我们用 replace 转义单引号，避免 XSS
-      var safeTitle = escapeHtml(vid.title).replace(/'/g, "\\'");
-      var safeImageUrl = escapeHtml(vid.imageUrl || '').replace(/'/g, "\\'");
-      var safeAffiliateLink = escapeHtml(vid.affiliateLink || '').replace(/'/g, "\\'");
-      var safeId = escapeHtml(id);
+      // onclick 参数使用 escapeJsStr，data-* 属性使用 escapeHtmlAttr
+      var safeTitle = escapeJsStr(vid.title);
+      var safeImageUrl = escapeJsStr(vid.imageUrl || '');
+      var safeAffiliateLink = escapeJsStr(vid.affiliateLink || '');
+      var safeId = escapeHtmlAttr(id);
 
       html += '<div class="card video-card" data-video-id="' + safeId + '">' +
-        '<h3>' + escapeHtml(vid.title) + ' <small>(' + safeId + ')</small></h3>' +
+        '<h3>' + escapeHtml(vid.title) + ' <small>(' + escapeHtml(id) + ')</small></h3>' +
         imgHtml +
         '<p><strong>推广链接：</strong>' + linkHtml + '</p>' +
         '<div class="btn-group">' +
-          '<button class="btn" onclick="showEditModal(\'' + escapeHtml(userId) + '\',\'' + escapeHtml(platformId) + '\',\'' + safeId + '\',\'' + safeTitle + '\',\'' + safeImageUrl + '\',\'' + safeAffiliateLink + '\')">编辑</button>' +
-          '<button class="btn danger" onclick="deleteVideo(\'' + escapeHtml(userId) + '\',\'' + escapeHtml(platformId) + '\',\'' + safeId + '\')">删除</button>' +
+          '<button class="btn" onclick="showEditModal(\'' + escapeJsStr(userId) + '\',\'' + escapeJsStr(platformId) + '\',\'' + safeId + '\',\'' + safeTitle + '\',\'' + safeImageUrl + '\',\'' + safeAffiliateLink + '\')">编辑</button>' +
+          '<button class="btn danger" onclick="deleteVideo(\'' + escapeJsStr(userId) + '\',\'' + escapeJsStr(platformId) + '\',\'' + safeId + '\')">删除</button>' +
         '</div>' +
       '</div>';
     }
@@ -318,7 +336,7 @@ function renderVideoListHtml(data, userId, platformId) {
 
   html += '</div>';
 
-  // 模态框（添加/编辑通用，ID输入框始终显示）
+  // 模态框（添加/编辑通用）
   html += '<div id="videoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">' +
     '<div style="background:white; border-radius:8px; padding:24px; max-width:500px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
       '<h3 id="modalTitle">添加视频</h3>' +
@@ -416,7 +434,7 @@ function renderVideoListHtml(data, userId, platformId) {
       'var data = await res.json();',
       'if (data.ok) location.reload(); else alert(data.error);',
     '}',
-    // 回车提交（新增）
+    // 回车提交
     'window.addEventListener("DOMContentLoaded", function() {',
       'var modalInputs = document.querySelectorAll("#videoModal input");',
       'for (var i = 0; i < modalInputs.length; i++) {',
@@ -429,8 +447,6 @@ function renderVideoListHtml(data, userId, platformId) {
 
   return adminPage(html, script);
 }
-
-
 
 // ========== 主入口 ==========
 export async function onRequest(context) {
@@ -583,7 +599,7 @@ export async function onRequest(context) {
       if (action === 'addVideo') {
         var userId = body.userId;
         var platformId = body.platformId;
-        var videoId = body.newVideoId; // 修复：前端发送的是 newVideoId
+        var videoId = body.newVideoId;
         var title = body.title;
         var imageUrl = body.imageUrl || "";
         var affiliateLink = body.affiliateLink || "";
@@ -632,7 +648,7 @@ export async function onRequest(context) {
           imageUrl: imageUrl,
           affiliateLink: affiliateLink
         };
-        await saveDataToKV(env, data);  // 修复：使用正确的保存函数
+        await saveDataToKV(env, data);
         return jsonResponse({ ok: true });
       }
 
