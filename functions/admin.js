@@ -12,15 +12,13 @@ export async function onRequest(context) {
     });
   }
 
-  // 获取请求方法
   const method = request.method;
-  
+
   // ===== POST：处理登录 =====
   if (method === 'POST') {
     try {
       const body = await request.json();
       const { password } = body;
-      
       if (password === adminPassword) {
         const token = await sha256(adminPassword);
         return new Response('登录成功', {
@@ -38,8 +36,21 @@ export async function onRequest(context) {
     }
   }
 
-  // ===== GET：显示页面 =====
-  // 检查是否已登录
+  // ===== GET：先检查退出请求（必须在登录检查之前）=====
+  if (url.searchParams.get('logout') === '1') {
+    return new Response(
+      '<h2>已退出登录</h2><p><a href="/admin">返回登录页</a></p>',
+      {
+        status: 200,
+        headers: {
+          'Set-Cookie': 'admin_token=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0',
+          'Content-Type': 'text/html;charset=UTF-8'
+        }
+      }
+    );
+  }
+
+  // ===== 然后检查是否已登录 =====
   const cookie = request.headers.get('Cookie') || '';
   const isLoggedIn = await checkLogin(cookie, adminPassword);
 
@@ -49,23 +60,13 @@ export async function onRequest(context) {
     });
   }
 
-  // 从 URL 参数判断是否退出登录
-  if (url.searchParams.get('logout') === '1') {
-    return new Response('已退出登录', {
-      status: 200,
-      headers: {
-        'Set-Cookie': 'admin_token=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0',
-        'Content-Type': 'text/html;charset=UTF-8'
-      }
-    });
-  }
-
-  // 显示登录页
+  // ===== 未登录：显示登录页 =====
   return new Response(getLoginPage(), {
     headers: { 'Content-Type': 'text/html;charset=UTF-8' }
   });
 }
 
+// ----- 辅助函数不变 -----
 async function sha256(message) {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
@@ -113,7 +114,6 @@ function getLoginPage() {
       const errorEl = document.getElementById('errorMsg');
       if (!password) { errorEl.textContent = '请输入密码'; errorEl.style.display = 'block'; return; }
       try {
-        // 注意：直接 POST 到 /admin（同一个 URL），通过 method 区分
         const res = await fetch('/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
