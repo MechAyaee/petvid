@@ -171,7 +171,7 @@ export async function onRequest(context) {
     const body = `
       <div class="breadcrumb">
         <a href="/">首页</a> &gt; 
-        <a href="/${accountId}">${accountId}</a> &gt; 
+        <a href="/${accountId}">${account.displayName}</a> &gt; 
         ${platform.displayName}
       </div>
       <h2 style="text-align:center;">${platform.displayName}</h2>
@@ -204,7 +204,7 @@ export async function onRequest(context) {
     const body = `
       <div class="breadcrumb">
         <a href="/">首页</a> &gt; 
-        <a href="/${accountId}">${accountId}</a> &gt; 
+        <a href="/${accountId}">${account.displayName}</a> &gt; 
         <a href="/${accountId}/${platformId}">${platformId}</a> &gt; 
         ${videoId}
       </div>
