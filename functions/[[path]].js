@@ -24,8 +24,8 @@ function getPlatformColor(name) {
   return PLATFORM_COLORS[Math.abs(hash) % PLATFORM_COLORS.length];
 }
 
-// === 数据 ===
-const data = {
+// === 📦 备份数据（仅当 KV 不可用时使用） ===
+const FALLBACK_DATA = {
   accounts: {
     marytiger: {
       displayName: "Mary Tiger",
@@ -52,6 +52,29 @@ const data = {
     }
   }
 };
+
+const KV_DATA_KEY = 'petvid_data';
+
+// === 📦 从 KV 读取数据（自动种子） ===
+async function getData(env) {
+  // 如果 KV 绑定存在
+  if (env.DATA && typeof env.DATA.get === 'function') {
+    try {
+      const stored = await env.DATA.get(KV_DATA_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      // 🚀 首次部署 → 自动将备份数据写入 KV
+      await env.DATA.put(KV_DATA_KEY, JSON.stringify(FALLBACK_DATA));
+      return FALLBACK_DATA;
+    } catch (e) {
+      console.error('KV 读取失败，使用备份数据:', e);
+      return FALLBACK_DATA;
+    }
+  }
+  // KV 绑定不可用（如本地开发）→ 使用备份
+  return FALLBACK_DATA;
+}
 
 // 辅助：构建完整 HTML 模板
 function htmlTemplate(title, bodyContent) {
@@ -87,6 +110,9 @@ export async function onRequest(context) {
       // ASSETS 不可用时，继续走函数逻辑
     }
   }
+
+  // ========== 📦 从 KV 获取数据 ==========
+  const data = await getData(env);
 
   const pathParts = params.path || [];
 
