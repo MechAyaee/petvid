@@ -2,68 +2,55 @@
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const path = url.pathname.replace('/admin', '') || '/';
 
-  // 获取管理员密码（从环境变量）
+  // 检查环境变量
   const adminPassword = env.ADMIN_PASSWORD;
   if (!adminPassword) {
-    return new Response('错误：未设置 ADMIN_PASSWORD 环境变量，请在 Cloudflare Pages 设置。', {
+    return new Response('请先在 Cloudflare 面板设置 ADMIN_PASSWORD 环境变量并重新部署', {
       status: 500,
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' }
+    });
+  }
+
+  // 获取请求方法
+  const method = request.method;
+  
+  // ===== POST：处理登录 =====
+  if (method === 'POST') {
+    try {
+      const body = await request.json();
+      const { password } = body;
+      
+      if (password === adminPassword) {
+        const token = await sha256(adminPassword);
+        return new Response('登录成功', {
+          status: 200,
+          headers: {
+            'Set-Cookie': `admin_token=${token}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=86400`,
+            'Content-Type': 'text/plain'
+          }
+        });
+      } else {
+        return new Response('密码错误', { status: 401 });
+      }
+    } catch (e) {
+      return new Response('请求格式错误', { status: 400 });
+    }
+  }
+
+  // ===== GET：显示页面 =====
+  // 检查是否已登录
+  const cookie = request.headers.get('Cookie') || '';
+  const isLoggedIn = await checkLogin(cookie, adminPassword);
+
+  if (isLoggedIn) {
+    return new Response('<h1>管理面板（稍后实现）</h1><a href="/admin?logout=1">退出登录</a>', {
       headers: { 'Content-Type': 'text/html;charset=UTF-8' }
     });
   }
 
-  // 已登录标记：检查 cookie
-  const cookie = request.headers.get('Cookie') || '';
-  const isLoggedIn = await checkLogin(cookie, adminPassword);
-
-  // 处理不同路径
-  if (path === '/' || path === '') {
-    // GET /admin 或 /admin/
-    if (isLoggedIn) {
-      // 已登录：返回管理面板占位页面（后续替换为真正的管理 UI）
-      return new Response('<h1>管理面板（稍后实现）</h1><a href="/admin/logout">退出登录</a>', {
-        headers: { 'Content-Type': 'text/html;charset=UTF-8' }
-      });
-    } else {
-      // 未登录：显示登录页面
-      return new Response(getLoginPage(), {
-        headers: { 'Content-Type': 'text/html;charset=UTF-8' }
-      });
-    }
-  }
-
-  // 处理登录 API
-  if (path === '/api/login' && request.method === 'POST') {
-    const body = await request.json();
-    const { password } = body;
-    if (password === adminPassword) {
-      // 登录成功：设置 cookie（密码的 sha256 作为令牌）
-      const token = await sha256(adminPassword);
-      return new Response('OK', {
-        status: 200,
-        headers: {
-          'Set-Cookie': `admin_token=${token}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=86400`,
-          'Content-Type': 'text/plain'
-        }
-      });
-    } else {
-      return new Response('密码错误', { status: 401 });
-    }
-  }
-
-  // 其它管理 API（稍后实现），需要登录认证
-  if (path.startsWith('/api/')) {
-    if (!isLoggedIn) {
-      return new Response('未授权', { status: 401 });
-    }
-    // 目前所有 API 返回占位响应
-    return new Response('API 占位', { status: 200 });
-  }
-
-  // 其他路径（如 /admin/logout）
-  if (path === '/logout') {
-    // 清除 cookie
+  // 从 URL 参数判断是否退出登录
+  if (url.searchParams.get('logout') === '1') {
     return new Response('已退出登录', {
       status: 200,
       headers: {
@@ -73,10 +60,12 @@ export async function onRequest(context) {
     });
   }
 
-  return new Response('Not Found', { status: 404 });
+  // 显示登录页
+  return new Response(getLoginPage(), {
+    headers: { 'Content-Type': 'text/html;charset=UTF-8' }
+  });
 }
 
-// 辅助函数
 async function sha256(message) {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
@@ -87,7 +76,6 @@ async function sha256(message) {
 
 async function checkLogin(cookie, adminPassword) {
   if (!cookie) return false;
-  // 从 cookie 中提取 admin_token
   const match = cookie.match(/admin_token=([^;]+)/);
   if (!match) return false;
   const token = match[1];
@@ -125,13 +113,13 @@ function getLoginPage() {
       const errorEl = document.getElementById('errorMsg');
       if (!password) { errorEl.textContent = '请输入密码'; errorEl.style.display = 'block'; return; }
       try {
-        const res = await fetch('/admin/api/login', {
+        // 注意：直接 POST 到 /admin（同一个 URL），通过 method 区分
+        const res = await fetch('/admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password })
         });
         if (res.ok) {
-          // 登录成功，刷新页面（此时 cookie 已设置）
           window.location.reload();
         } else {
           const text = await res.text();
@@ -143,7 +131,6 @@ function getLoginPage() {
         errorEl.style.display = 'block';
       }
     });
-    // 按回车触发登录
     document.getElementById('password').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') document.getElementById('loginBtn').click();
     });
