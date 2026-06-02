@@ -246,7 +246,7 @@ function renderPlatformListHtml(data, userId) {
   return adminPage(html, script);
 }
 
-// ========== 渲染视频列表 ==========
+// ========== 渲染视频列表（改进版） ==========
 function renderVideoListHtml(data, userId, platformId) {
   var user = data.accounts[userId];
   if (!user) return renderUserListHtml(data);
@@ -259,28 +259,27 @@ function renderVideoListHtml(data, userId, platformId) {
       '<a href="/admin?path=user/' + userId + '">' + user.displayName + '</a>' +
     '</div>' +
     '<div class="toolbar">' +
-      '<input type="text" id="newVideoId" placeholder="视频ID (如 V001)" />' +
-      '<input type="text" id="newVideoTitle" placeholder="标题" />' +
-      '<input type="text" id="newVideoImageUrl" placeholder="图片URL" />' +
-      '<input type="text" id="newVideoAffiliateLink" placeholder="推广链接" />' +
-      '<button class="btn" onclick="addVideo(\'' + userId + '\',\'' + platformId + '\')">添加视频</button>' +
+      '<button class="btn" onclick="showAddModal(\'' + userId + '\',\'' + platformId + '\')">+ 添加视频</button>' +
     '</div>' +
     '<div class="card-grid">';
 
   var videos = platform.videos || {};
   var keys = Object.keys(videos);
   if (keys.length === 0) {
-    html += '<p>暂无视频</p>';
+    html += '<p>暂无视频，点击上方按钮添加</p>';
   } else {
     for (var i = 0; i < keys.length; i++) {
       var id = keys[i];
       var vid = videos[id];
-      html += '<div class="card video-card">' +
+      var imgHtml = (vid.imageUrl) ? '<img src="' + vid.imageUrl + '" alt="' + vid.title + '" style="max-width:160px; border-radius:4px; margin:8px 0;" />' : '<p style="color:#999;">未设置图片</p>';
+      var linkHtml = (vid.affiliateLink) ? '<a href="' + vid.affiliateLink + '" target="_blank" style="word-break:break-all;">' + vid.affiliateLink + '</a>' : '<span style="color:#999;">未设置推广链接</span>';
+
+      html += '<div class="card video-card" data-video-id="' + id + '">' +
         '<h3>' + vid.title + ' <small>(' + id + ')</small></h3>' +
-        '<img src="' + vid.imageUrl + '" alt="' + vid.title + '" style="max-width:100px; border-radius:4px;" />' +
-        '<p>推广链接: <a href="' + vid.affiliateLink + '" target="_blank">点击</a></p>' +
+        imgHtml +
+        '<p><strong>推广链接：</strong>' + linkHtml + '</p>' +
         '<div class="btn-group">' +
-          '<button class="btn" onclick="editVideo(\'' + userId + '\',\'' + platformId + '\',\'' + id + '\')">编辑</button>' +
+          '<button class="btn" onclick="showEditModal(\'' + userId + '\',\'' + platformId + '\',\'' + id + '\',\'' + vid.title.replace(/'/g, "\\'") + '\',\'' + (vid.imageUrl || '').replace(/'/g, "\\'") + '\',\'' + (vid.affiliateLink || '').replace(/'/g, "\\'") + '\')">编辑</button>' +
           '<button class="btn danger" onclick="deleteVideo(\'' + userId + '\',\'' + platformId + '\',\'' + id + '\')">删除</button>' +
         '</div>' +
       '</div>';
@@ -289,21 +288,96 @@ function renderVideoListHtml(data, userId, platformId) {
 
   html += '</div>';
 
+  // 模态框 HTML（添加和编辑共用一个）
+  html += '<div id="videoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">' +
+    '<div style="background:white; border-radius:8px; padding:24px; max-width:500px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.2);">' +
+      '<h3 id="modalTitle">添加视频</h3>' +
+      '<input type="hidden" id="modalVideoId" />' +
+      '<input type="hidden" id="modalUserId" />' +
+      '<input type="hidden" id="modalPlatformId" />' +
+      '<div style="margin-bottom:12px;"><label>视频ID</label><input type="text" id="modalVideoIdInput" placeholder="如 V001" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
+      '<div style="margin-bottom:12px;"><label>标题</label><input type="text" id="modalTitleInput" placeholder="请输入视频标题" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
+      '<div style="margin-bottom:12px;"><label>图片URL</label><input type="text" id="modalImageUrlInput" placeholder="https://example.com/thumbnail.jpg" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" oninput="previewImage()" /></div>' +
+      '<div style="margin-bottom:12px;" id="previewContainer"><img id="previewImage" style="max-width:200px; max-height:120px; display:none; border-radius:4px;" /></div>' +
+      '<div style="margin-bottom:12px;"><label>推广链接</label><input type="text" id="modalAffiliateLinkInput" placeholder="https://s.click.taobao.com/xxx 或你的联盟链接" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>' +
+      '<div style="text-align:right; margin-top:16px;">' +
+        '<button class="btn danger" onclick="closeModal()" style="margin-right:8px;">取消</button>' +
+        '<button class="btn" onclick="saveVideo()">保存</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
   var script = [
-    'async function addVideo(userId, platformId) {',
-      'var videoId = document.getElementById("newVideoId").value.trim();',
-      'var title = document.getElementById("newVideoTitle").value.trim();',
-      'var imageUrl = document.getElementById("newVideoImageUrl").value.trim();',
-      'var affiliateLink = document.getElementById("newVideoAffiliateLink").value.trim();',
-      'if (!videoId || !title || !imageUrl || !affiliateLink) return alert("请填写完整");',
+    // ----- 模态框控制 -----
+    'function showAddModal(userId, platformId) {',
+      'document.getElementById("modalTitle").innerText = "添加视频";',
+      'document.getElementById("modalVideoIdInput").value = "";',
+      'document.getElementById("modalTitleInput").value = "";',
+      'document.getElementById("modalImageUrlInput").value = "";',
+      'document.getElementById("modalAffiliateLinkInput").value = "";',
+      'document.getElementById("modalVideoId").value = "";',
+      'document.getElementById("modalUserId").value = userId;',
+      'document.getElementById("modalPlatformId").value = platformId;',
+      'document.getElementById("modalVideoIdInput").style.display = "block";',
+      'document.getElementById("previewImage").style.display = "none";',
+      'document.getElementById("videoModal").style.display = "flex";',
+    '}',
+    'function showEditModal(userId, platformId, videoId, title, imageUrl, affiliateLink) {',
+      'document.getElementById("modalTitle").innerText = "编辑视频";',
+      'document.getElementById("modalVideoIdInput").value = videoId;',
+      'document.getElementById("modalTitleInput").value = title;',
+      'document.getElementById("modalImageUrlInput").value = imageUrl;',
+      'document.getElementById("modalAffiliateLinkInput").value = affiliateLink;',
+      'document.getElementById("modalVideoId").value = videoId;',
+      'document.getElementById("modalUserId").value = userId;',
+      'document.getElementById("modalPlatformId").value = platformId;',
+      'document.getElementById("modalVideoIdInput").style.display = "none";',  // 编辑时不允许改ID
+      'if (imageUrl) { document.getElementById("previewImage").src = imageUrl; document.getElementById("previewImage").style.display = "block"; }',
+      'document.getElementById("videoModal").style.display = "flex";',
+    '}',
+    'function closeModal() {',
+      'document.getElementById("videoModal").style.display = "none";',
+    '}',
+    // 图片预��
+    'function previewImage() {',
+      'var url = document.getElementById("modalImageUrlInput").value;',
+      'if (url && url.startsWith("http")) {',
+        'document.getElementById("previewImage").src = url;',
+        'document.getElementById("previewImage").style.display = "block";',
+      '} else {',
+        'document.getElementById("previewImage").style.display = "none";',
+      '}',
+    '}',
+    // 保存视频（添加或更新）
+    'async function saveVideo() {',
+      'var userId = document.getElementById("modalUserId").value;',
+      'var platformId = document.getElementById("modalPlatformId").value;',
+      'var videoId = document.getElementById("modalVideoIdInput").value.trim();',
+      'var title = document.getElementById("modalTitleInput").value.trim();',
+      'var imageUrl = document.getElementById("modalImageUrlInput").value.trim();',
+      'var affiliateLink = document.getElementById("modalAffiliateLinkInput").value.trim();',
+      'var editMode = !!document.getElementById("modalVideoId").value;',  // 判断是否为编辑模式
+      'if (editMode) { videoId = document.getElementById("modalVideoId").value; }',  // 编辑时用原ID
+      'if (!videoId || !title) { alert("视频ID和标题不能为空"); return; }',
+      'var action = editMode ? "editVideo" : "addVideo";',
       'var res = await fetch("/admin", {',
         'method: "POST",',
         'headers: {"Content-Type": "application/json"},',
-        'body: JSON.stringify({ action: "addVideo", userId: userId, platformId: platformId, videoId: videoId, title: title, imageUrl: imageUrl, affiliateLink: affiliateLink })',
+        'body: JSON.stringify({',
+          'action: action,',
+          'userId: userId,',
+          'platformId: platformId,',
+          'videoId: videoId,',
+          'title: title,',
+          'imageUrl: imageUrl || "",',
+          'affiliateLink: affiliateLink || ""',
+        '})',
       '});',
       'var data = await res.json();',
-      'if (data.ok) location.reload(); else alert(data.error);',
+      'if (data.ok) { closeModal(); location.reload(); }',
+      'else { alert(data.error); }',
     '}',
+    // 已有的 deleteVideo 保持不变
     'async function deleteVideo(userId, platformId, videoId) {',
       'if (!confirm("确定删除视频 " + videoId + " ？")) return;',
       'var res = await fetch("/admin", {',
@@ -314,23 +388,16 @@ function renderVideoListHtml(data, userId, platformId) {
       'var data = await res.json();',
       'if (data.ok) location.reload(); else alert(data.error);',
     '}',
-    'async function editVideo(userId, platformId, videoId) {',
-      'var title = prompt("新标题：") || "";',
-      'var imageUrl = prompt("新图片URL：") || "";',
-      'var affiliateLink = prompt("新推广链接：") || "";',
-      'if (!title || !imageUrl || !affiliateLink) return alert("取消或未填写完整");',
-      'var res = await fetch("/admin", {',
-        'method: "POST",',
-        'headers: {"Content-Type": "application/json"},',
-        'body: JSON.stringify({ action: "editVideo", userId: userId, platformId: platformId, videoId: videoId, title: title, imageUrl: imageUrl, affiliateLink: affiliateLink })',
-      '});',
-      'var data = await res.json();',
-      'if (data.ok) location.reload(); else alert(data.error);',
-    '}',
+    // 点击模态框外部关闭（可选）
+    'document.getElementById("videoModal").addEventListener("click", function(e) {',
+      'if (e.target === this) closeModal();',
+    '});',
   ].join('\n');
 
   return adminPage(html, script);
 }
+
+
 
 // ========== 主入口 ==========
 export async function onRequest(context) {
