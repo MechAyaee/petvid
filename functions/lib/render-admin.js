@@ -362,7 +362,4 @@ function addPlatformModal() {
   `;
 }
 
-// 保留旧版 renderVideoListHtml 供其他页面调用（实际重定向到新函数）
-export function renderVideoListHtml(data, userId, platformId) {
-  return renderVideoList(data, userId, platformId);
-}
+

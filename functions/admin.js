@@ -2,7 +2,7 @@
 
 import { getDataFromKV, saveDataToKV } from './lib/db.js';
 import { escapeHtml, escapeJsStr, generateVideoId, jsonResponse, sha256 } from './lib/helpers.js';
-import { renderAdminHtml } from './lib/render-videos.js';
+import { renderAdminHtml } from './lib/render-admin.js';
 import { authenticateAdmin } from './lib/auth.js';
 
 export async function onRequest(context) {

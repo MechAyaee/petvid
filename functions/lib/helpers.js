@@ -72,32 +72,26 @@ export async function generateVideoId(title, existingIds) {
 }
 
 /**
- * 兼容旧数据：确保数据结构中包含 `deleted`、`id`、`videoIndex` 等字段
- * 调用时机：每次从 KV 读取数据后
+ * 确保数据结构完整，初始化缺失的字段
  */
 export function sanitizeData(data) {
   if (!data) data = {};
   if (!data.accounts) data.accounts = {};
-  if (!data.videoIndex) data.videoIndex = {};   // 哈希 -> { userId, platformId }
+  if (!data.videoIndex) data.videoIndex = {};
 
   const userIds = Object.keys(data.accounts);
   for (const userId of userIds) {
     const user = data.accounts[userId];
     if (!user.platforms) user.platforms = {};
-    const platformIds = Object.keys(user.platforms);
-    for (const platformId of platformIds) {
+    for (const platformId of Object.keys(user.platforms)) {
       const platform = user.platforms[platformId];
       if (!platform.videos) platform.videos = {};
-      const videoIds = Object.keys(platform.videos);
-      for (const videoId of videoIds) {
+      for (const videoId of Object.keys(platform.videos)) {
         const video = platform.videos[videoId];
-        // 兼容旧数据：添加 deleted 字段
         if (video.deleted === undefined) video.deleted = false;
         if (video.deletedAt === undefined) video.deletedAt = null;
-        // 兼容旧数据：添加 id 字段（哈希值），如果不一致则使用 videoId 作为 id
-        if (!video.id) video.id = videoId;  // 旧数据中 videoId 本身可能不是哈希，但保留
-        // 注意：旧数据中 videoId 是用户自定义的短 ID，我们将在后端 addVideo 时统一改为哈希。
-        // 此处不改变原有键名，仅新增 id 字段（哈希）。
+        // 确保每个视频都有 id 字段（哈希 ID）
+        if (!video.id) video.id = videoId;
       }
     }
   }
