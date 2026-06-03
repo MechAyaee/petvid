@@ -1,4 +1,4 @@
-// functions/lib/render-videos.js
+// functions/lib/render-admin.js
 
 import { escapeHtml, escapeHtmlAttr, escapeJsStr, generateVideoId } from './helpers.js';
 import { adminPage } from './page.js';
@@ -47,7 +47,7 @@ function renderUserList(data) {
         ? '<p>暂无用户</p>'
         : Object.entries(data.accounts).map(([uid, u]) => `
           <div class="card">
-            <h3><a href="/admin?path=user/${encodeURIComponent(uid)}">${escapeHtml(u.displayName)}</a></h3>
+            <h3><a href="/admin/${encodeURIComponent(uid)}">${escapeHtml(u.displayName)}</a></h3>
             <p>ID: ${escapeHtml(uid)}</p>
             <p>平台数: ${Object.keys(u.platforms || {}).length}</p>
             <button class="btn danger" onclick="deleteUser('${escapeJsStr(uid)}','${escapeJsStr(u.displayName)}')">删除</button>
@@ -102,7 +102,7 @@ function renderPlatformList(data, userId) {
         ? '<p>暂无平台</p>'
         : Object.entries(platforms).map(([pid, p]) => `
           <div class="card">
-            <h3><a href="/admin?path=user/${encodeURIComponent(userId)}/platform/${encodeURIComponent(pid)}">${escapeHtml(p.displayName)}</a></h3>
+            <h3><a href="/admin/${encodeURIComponent(userId)}/${encodeURIComponent(pid)}">${escapeHtml(p.displayName)}</a></h3>
             <p>视频数: ${Object.keys(p.videos || {}).filter(vid => !p.videos[vid].deleted).length}</p>
             <button class="btn danger" onclick="deletePlatform('${escapeJsStr(userId)}','${escapeJsStr(pid)}','${escapeJsStr(p.displayName)}')">删除</button>
           </div>
@@ -151,12 +151,12 @@ function renderVideoList(data, userId, platformId) {
     <h2>${escapeHtml(platform.displayName)} 的视频</h2>
     <div class="breadcrumb">
       <a href="/admin">用户列表</a> &gt;
-      <a href="/admin?path=user/${encodeURIComponent(userId)}">${escapeHtml(user.displayName)}</a> &gt;
+      <a href="/admin/${encodeURIComponent(userId)}">${escapeHtml(user.displayName)}</a> &gt;
       ${escapeHtml(platform.displayName)}
     </div>
     <div class="toolbar">
       <button class="btn" onclick="showAddVideoModal()">+ 添加视频</button>
-      <button class="btn" onclick="window.location='/admin?path=user/${encodeURIComponent(userId)}/platform/${encodeURIComponent(platformId)}/recycle'">回收站 (${Object.values(videos).filter(v=>v.deleted).length})</button>
+      <button class="btn" onclick="window.location='/admin/${encodeURIComponent(userId)}/${encodeURIComponent(platformId)}/recycle'">回收站 (${Object.values(videos).filter(v=>v.deleted).length})</button>
     </div>
     <div class="card-grid">
       ${Object.keys(activeVideos).length === 0
@@ -239,12 +239,12 @@ function renderRecycleBin(data, userId, platformId) {
     <h2>回收站 - ${escapeHtml(platform.displayName)}</h2>
     <div class="breadcrumb">
       <a href="/admin">用户列表</a> &gt;
-      <a href="/admin?path=user/${encodeURIComponent(userId)}">${escapeHtml(user.displayName)}</a> &gt;
-      <a href="/admin?path=user/${encodeURIComponent(userId)}/platform/${encodeURIComponent(platformId)}">${escapeHtml(platform.displayName)}</a> &gt;
+      <a href="/admin/${encodeURIComponent(userId)}">${escapeHtml(user.displayName)}</a> &gt;
+      <a href="/admin/${encodeURIComponent(userId)}/${encodeURIComponent(platformId)}">${escapeHtml(platform.displayName)}</a> &gt;
       回收站
     </div>
     <div class="toolbar">
-      <a class="btn" href="/admin?path=user/${encodeURIComponent(userId)}/platform/${encodeURIComponent(platformId)}">← 返回视频列表</a>
+      <a class="btn" href="/admin/${encodeURIComponent(userId)}/${encodeURIComponent(platformId)}">← 返回视频列表</a>
     </div>
     <div class="card-grid">
       ${Object.keys(deletedVideos).length === 0

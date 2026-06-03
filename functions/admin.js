@@ -8,8 +8,15 @@ import { authenticateAdmin } from './lib/auth.js';
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const path = url.searchParams.get('path') || '';
   const method = request.method.toUpperCase();
+
+  // 从 URL path 中提取 /admin 后的路径部分
+  // /admin               → parts = []
+  // /admin/zhangsan      → parts = ['zhangsan']
+  // /admin/zhangsan/tube → parts = ['zhangsan', 'tube']
+  // /admin/zhangsan/tube/recycle → parts = ['zhangsan', 'tube', 'recycle']
+  const pathParts = url.pathname.split('/').filter(p => p);
+  if (pathParts[0] === 'admin') pathParts.shift();
 
   // ---------- 优先处理密码登录（POST 且 Content-Type 为 JSON） ----------
   if (method === 'POST') {
@@ -20,9 +27,7 @@ export async function onRequest(context) {
         if (body.password) {
           return handlePasswordLogin(body.password, env);
         }
-      } catch (e) {
-        // 解析失败，继续后续处理
-      }
+      } catch (e) { /* 解析失败，继续后续处理 */ }
     }
   }
 
@@ -40,16 +45,15 @@ export async function onRequest(context) {
     );
   }
 
-  
   // ---------- 验证管理员身份（除了密码登录、退出登录之外的请求） ----------
   const authError = await authenticateAdmin(context);
   if (authError) return authError;
 
   // ---------- 路由 ----------
   if (method === 'GET') {
-    return handleGet(context, path);
+    return handleGet(context, pathParts);
   } else if (method === 'POST') {
-    return handlePost(context, path);
+    return handlePost(context, pathParts);
   } else {
     return new Response('Method Not Allowed', { status: 405 });
   }
@@ -76,22 +80,29 @@ async function handlePasswordLogin(password, env) {
 }
 
 // ---------- GET 请求：渲染管理页面 ----------
-async function handleGet(context, path) {
+async function handleGet(context, pathParts) {
   const { env } = context;
   let data = await getDataFromKV(env);
 
-  // 解析路径：user/xxx/platform/xxx/recycle
-  const parts = path.split('/').filter(p => p);
+  // pathParts: [] → 用户列表
+  // pathParts: ['{account}'] → 平台列表
+  // pathParts: ['{account}', '{platform}'] → 视频列表
+  // pathParts: ['{account}', '{platform}', 'recycle'] → 回收站
+  // pathParts: 长度 >= 3 且不是 recycle → 404
   let userId = null;
   let platformId = null;
   let showRecycle = false;
 
-  if (parts.length >= 2 && parts[0] === 'user') {
-    userId = parts[1];
-    if (parts.length >= 4 && parts[2] === 'platform') {
-      platformId = parts[3];
-      if (parts.length >= 5 && parts[4] === 'recycle') {
-        showRecycle = true;
+  if (pathParts.length >= 1) {
+    userId = pathParts[0];
+    if (pathParts.length >= 2) {
+      platformId = pathParts[1];
+      if (pathParts.length >= 3) {
+        if (pathParts[2] === 'recycle') {
+          showRecycle = true;
+        } else {
+          return new Response('Not Found', { status: 404 });
+        }
       }
     }
   }
@@ -103,7 +114,7 @@ async function handleGet(context, path) {
 }
 
 // ---------- POST 请求：处理所有 API 操作 ----------
-async function handlePost(context, path) {
+async function handlePost(context, pathParts) {
   const { request, env } = context;
   let data = await getDataFromKV(env);
   let body;
@@ -113,18 +124,19 @@ async function handlePost(context, path) {
     return jsonResponse({ error: '请求体必须是有效的 JSON' }, 400);
   }
   const action = body.action;
-  // ---------- 改进的路径解析（兼容 body） ----------
-  const parts = path.split('/').filter(p => p);
+
+  // 从路径或 body 中提取 userId/platformId
   let userId, platformId;
-  if (parts.length >= 4 && parts[0] === 'user' && parts[2] === 'platform') {
-    userId = parts[1];
-    platformId = parts[3];
+  if (pathParts.length >= 2) {
+    userId = pathParts[0];
+    platformId = pathParts[1];
   } else if (body.userId && body.platformId) {
     userId = body.userId;
     platformId = body.platformId;
   } else {
     return jsonResponse({ error: '路径格式错误或请求体缺少 userId/platformId' }, 400);
   }
+
   // 确保用户和平台存在
   if (!data.accounts[userId] || !data.accounts[userId].platforms[platformId]) {
     return jsonResponse({ error: '用户或平台不存在' }, 404);
