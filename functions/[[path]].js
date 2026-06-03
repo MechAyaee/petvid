@@ -139,8 +139,8 @@ export async function onRequest(context) {
             <img src="${video.imageUrl}" alt="${video.title}" style="max-width:100%; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
           </a>
         </div>
-        <p>点击图片前往广告商页面</p>
-        <a href="/" class="back-link">← 返回首页</a>
+        <p>Click the image to watch the video</p>
+        <a href="/" class="back-link">← Back to Home</a>
       </div>`;
     return new Response(htmlTemplate(video.title, body), {
       headers: { 'Content-Type': 'text/html' }
