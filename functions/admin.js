@@ -33,7 +33,7 @@ export async function onRequest(context) {
       {
         status: 200,
         headers: {
-          'Set-Cookie': 'admin_token=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0',
+          'Set-Cookie': 'admin_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
           'Content-Type': 'text/html; charset=UTF-8'
         }
       }
@@ -65,7 +65,7 @@ async function handlePasswordLogin(password, env) {
     return new Response('登录成功', {
       status: 200,
       headers: {
-        'Set-Cookie': `admin_token=${token}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=86400`,
+        'Set-Cookie': `admin_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`,
         'Content-Type': 'text/plain'
       }
     });
