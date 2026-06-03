@@ -16,7 +16,7 @@ export async function onRequest(context) {
     const contentType = request.headers.get('Content-Type') || '';
     if (contentType.includes('application/json')) {
       try {
-        const body = await request.json();
+        const body = await request.clone().json();
         if (body.password) {
           return handlePasswordLogin(body.password, env);
         }
