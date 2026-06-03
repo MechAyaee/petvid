@@ -210,7 +210,7 @@ async function handlePost(context, pathParts) {
   try {
     switch (action) {
 
-            // ---------- 添加视频 ----------
+                  // ---------- 添加视频 ----------
       case 'addVideo': {
         const title = (body.title || '').trim();
         let imageUrl = (body.imageUrl || '').trim();
@@ -223,9 +223,10 @@ async function handlePost(context, pathParts) {
         const existingIds = new Set(Object.keys(platform.videos));
         const newId = await generateVideoId(title, existingIds);
 
-        // 图片 URL 为空时自动填充占位图
+        // 图片 URL 为空时根据模式自动填充占位图
         if (!imageUrl) {
-          imageUrl = `https://picsum.photos/400/225?random=${newId}`;
+          const mode = body.placeholderMode || 'kitten';
+          imageUrl = getPlaceholderUrl(mode, newId);
         }
 
         platform.videos[newId] = {
@@ -282,7 +283,7 @@ async function handlePost(context, pathParts) {
         return jsonResponse({ success: true, message: '视频已永久删除' });
       }
 
-      // ---------- 更新视频（编辑） ----------
+            // ---------- 更新视频（编辑） ----------
       case 'updateVideo': {
         const videoId = body.videoId;
         if (!videoId || !platform.videos[videoId]) {
@@ -291,8 +292,14 @@ async function handlePost(context, pathParts) {
         const title = (body.title || '').trim();
         if (!title) return jsonResponse({ error: '标题不能为空' }, 400);
         platform.videos[videoId].title = title;
-        // 图片 URL 留空时自动填充占位图
-        platform.videos[videoId].imageUrl = (body.imageUrl || '').trim() || `https://picsum.photos/400/225?random=${videoId}`;
+        // 图片 URL 留空时根据模式自动填充占位图
+        const imageUrl = (body.imageUrl || '').trim();
+        if (imageUrl) {
+          platform.videos[videoId].imageUrl = imageUrl;
+        } else {
+          const mode = body.placeholderMode || 'kitten';
+          platform.videos[videoId].imageUrl = getPlaceholderUrl(mode, videoId);
+        }
         platform.videos[videoId].affiliateLink = (body.affiliateLink || '').trim();
         await saveDataToKV(env, data);
         return jsonResponse({ success: true, message: '视频已更新' });
@@ -328,8 +335,21 @@ async function handlePost(context, pathParts) {
       default:
         return jsonResponse({ error: '未知操作' }, 400);
     }
-  } catch (err) {
+    } catch (err) {
     console.error('Admin POST 错误:', err);
     return jsonResponse({ error: '服务器错误: ' + err.message }, 500);
+  }
+}
+
+// ---- 占位图模式映射 ----
+function getPlaceholderUrl(mode, seed) {
+  switch (mode) {
+    case 'dog':
+      return `https://placedog.net/400/229?random=${seed}`;
+    case 'random':
+      return `https://loremflickr.com/400/225/pet?random=${seed}`;
+    case 'kitten':
+    default:
+      return `https://placekitten.com/400/225`;
   }
 }

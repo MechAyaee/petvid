@@ -202,6 +202,12 @@ function renderVideoList(data, userId, platformId) {
     <div class="toolbar">
       <button class="btn" onclick="showAddVideoModal()">+ 添加视频</button>
       <button class="btn" onclick="window.location='/admin/${encodeURIComponent(userId)}/${encodeURIComponent(platformId)}/recycle'">回收站 (${Object.values(videos).filter(v=>v.deleted).length})</button>
+      <span style="margin-left:12px; display:inline-flex; align-items:center; gap:4px;">
+        <span style="font-size:13px; color:#666;">占位图:</span>
+        <button class="btn placeholder-btn" data-mode="kitten" onclick="setPlaceholderMode('kitten')" style="padding:4px 8px; font-size:13px;">🐱</button>
+        <button class="btn placeholder-btn" data-mode="dog" onclick="setPlaceholderMode('dog')" style="padding:4px 8px; font-size:13px;">🐶</button>
+        <button class="btn placeholder-btn" data-mode="random" onclick="setPlaceholderMode('random')" style="padding:4px 8px; font-size:13px;">🎲</button>
+      </span>
     </div>
     <div class="card-grid">
       ${Object.keys(activeVideos).length === 0
@@ -223,6 +229,21 @@ function renderVideoList(data, userId, platformId) {
 
   const script = `
     const allAccounts = ${JSON.stringify(allAccounts)};
+
+    // ---- 占位图模式 ----
+    let currentPlaceholderMode = localStorage.getItem('petvid_placeholder_mode') || 'kitten';
+    function updatePlaceholderUI() {
+      document.querySelectorAll('.placeholder-btn').forEach(b => {
+        b.style.border = b.dataset.mode === currentPlaceholderMode ? '2px solid #007bff' : '1px solid #ccc';
+        b.style.fontWeight = b.dataset.mode === currentPlaceholderMode ? 'bold' : 'normal';
+      });
+    }
+    function setPlaceholderMode(mode) {
+      currentPlaceholderMode = mode;
+      localStorage.setItem('petvid_placeholder_mode', mode);
+      updatePlaceholderUI();
+    }
+    updatePlaceholderUI();
 
     function showAddVideoModal() {
       document.getElementById('modalTitle').innerText = '添加视频';
@@ -262,7 +283,8 @@ function renderVideoList(data, userId, platformId) {
         videoId,
         title,
         imageUrl,
-        affiliateLink
+        affiliateLink,
+        placeholderMode: currentPlaceholderMode
       };
       const res = await fetch('/admin', {
         method: 'POST',
