@@ -105,30 +105,29 @@ async function handleGet(context, path) {
 async function handlePost(context, path) {
   const { request, env } = context;
   let data = await getDataFromKV(env);
-
-  // 尝试解析 JSON 请求体（兼容 formData 则留空，但前端均使用 JSON）
   let body;
   try {
     body = await request.json();
   } catch {
     return jsonResponse({ error: '请求体必须是有效的 JSON' }, 400);
   }
-
   const action = body.action;
-
-  // 解析路径：user/xxx/platform/xxx
+  // ---------- 改进的路径解析（兼容 body） ----------
   const parts = path.split('/').filter(p => p);
-  if (parts.length < 4 || parts[0] !== 'user' || parts[2] !== 'platform') {
-    return jsonResponse({ error: '路径格式错误' }, 400);
+  let userId, platformId;
+  if (parts.length >= 4 && parts[0] === 'user' && parts[2] === 'platform') {
+    userId = parts[1];
+    platformId = parts[3];
+  } else if (body.userId && body.platformId) {
+    userId = body.userId;
+    platformId = body.platformId;
+  } else {
+    return jsonResponse({ error: '路径格式错误或请求体缺少 userId/platformId' }, 400);
   }
-  const userId = parts[1];
-  const platformId = parts[3];
-
   // 确保用户和平台存在
   if (!data.accounts[userId] || !data.accounts[userId].platforms[platformId]) {
     return jsonResponse({ error: '用户或平台不存在' }, 404);
   }
-
   const platform = data.accounts[userId].platforms[platformId];
   if (!platform.videos) platform.videos = {};
 
