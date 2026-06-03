@@ -345,11 +345,11 @@ async function handlePost(context, pathParts) {
 function getPlaceholderUrl(mode, seed) {
   switch (mode) {
     case 'dog':
-      return `https://placedog.net/400/229?random=${seed}`;
+      return `https://placedog.net/400/${seed}`;
     case 'random':
       return `https://loremflickr.com/400/225/pet?random=${seed}`;
     case 'kitten':
     default:
-      return `https://placekitten.com/400/225`;
+      return `https://placekitten.com/400/${seed}`;
   }
 }
