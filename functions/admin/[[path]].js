@@ -1,22 +1,19 @@
-// functions/admin.js
+// functions/admin/[[path]].js
 
-import { getDataFromKV, saveDataToKV } from './lib/db.js';
-import { escapeHtml, escapeJsStr, generateVideoId, jsonResponse, sha256 } from './lib/helpers.js';
-import { renderAdminHtml } from './lib/render-admin.js';
-import { authenticateAdmin } from './lib/auth.js';
+import { getDataFromKV, saveDataToKV } from '../lib/db.js';
+import { escapeHtml, escapeJsStr, generateVideoId, jsonResponse, sha256 } from '../lib/helpers.js';
+import { renderAdminHtml } from '../lib/render-admin.js';
+import { authenticateAdmin } from '../lib/auth.js';
 
 export async function onRequest(context) {
-  const { request, env } = context;
+  const { request, params, env } = context;
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
 
-  // 从 URL path 中提取 /admin 后的路径部分
-  // /admin               → parts = []
-  // /admin/zhangsan      → parts = ['zhangsan']
-  // /admin/zhangsan/tube → parts = ['zhangsan', 'tube']
-  // /admin/zhangsan/tube/recycle → parts = ['zhangsan', 'tube', 'recycle']
-  const pathParts = url.pathname.split('/').filter(p => p);
-  if (pathParts[0] === 'admin') pathParts.shift();
+  // /admin               → params.path = [] 或 undefined
+  // /admin/zhangsan      → params.path = ['zhangsan']
+  // /admin/zhangsan/tube → params.path = ['zhangsan', 'tube']
+  const pathParts = params.path || [];
 
   // ---------- 优先处理密码登录（POST 且 Content-Type 为 JSON） ----------
   if (method === 'POST') {
@@ -125,7 +122,50 @@ async function handlePost(context, pathParts) {
   }
   const action = body.action;
 
-  // 从路径或 body 中提取 userId/platformId
+  // ---- 操作：添加/删除用户（不需要路径中的 userId/platformId） ----
+  if (action === 'addUser') {
+    const uid = (body.userId || '').trim();
+    const name = (body.displayName || '').trim();
+    if (!uid || !name) return jsonResponse({ error: '用户ID和显示名称不能为空' }, 400);
+    if (data.accounts[uid]) return jsonResponse({ error: '用户ID已存在' }, 400);
+    data.accounts[uid] = { displayName: name, platforms: {} };
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '用户已添加' });
+  }
+
+  if (action === 'deleteUser') {
+    const uid = body.userId;
+    if (!uid || !data.accounts[uid]) return jsonResponse({ error: '用户不存在' }, 404);
+    delete data.accounts[uid];
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '用户已删除' });
+  }
+
+  // ---- 操作：添加/删除平台（仅需要 userId，不需要 platformId 路径） ----
+  if (action === 'addPlatform') {
+    const uid = (body.userId || '').trim();
+    const pid = (body.platformId || '').trim();
+    const name = (body.displayName || '').trim();
+    if (!uid || !pid || !name) return jsonResponse({ error: '参数不完整' }, 400);
+    if (!data.accounts[uid]) return jsonResponse({ error: '用户不存在' }, 404);
+    if (data.accounts[uid].platforms[pid]) return jsonResponse({ error: '平台ID已存在' }, 400);
+    data.accounts[uid].platforms[pid] = { displayName: name, videos: {} };
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '平台已添加' });
+  }
+
+  if (action === 'deletePlatform') {
+    const uid = body.userId;
+    const pid = body.platformId;
+    if (!uid || !pid || !data.accounts[uid] || !data.accounts[uid].platforms[pid]) {
+      return jsonResponse({ error: '用户或平台不存在' }, 404);
+    }
+    delete data.accounts[uid].platforms[pid];
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '平台已删除' });
+  }
+
+  // ---- 以下操作需要路径或 body 中的 userId/platformId ----
   let userId, platformId;
   if (pathParts.length >= 2) {
     userId = pathParts[0];
