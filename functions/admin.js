@@ -40,6 +40,7 @@ export async function onRequest(context) {
     );
   }
 
+  
   // ---------- 验证管理员身份（除了密码登录、退出登录之外的请求） ----------
   const authError = await authenticateAdmin(context);
   if (authError) return authError;

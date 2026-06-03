@@ -315,6 +315,7 @@ export async function onRequest(context) {
     });
   }
 
+  
   return new Response(render404Page('无效路径'), {
     status: 404, headers: { 'Content-Type': 'text/html' }
   });
