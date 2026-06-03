@@ -2,6 +2,12 @@
 
 import { sha256 } from './helpers.js';
 
+/**
+ * 检查 Cookie 中的 token 是否有效
+ * @param {string|null} cookie
+ * @param {string} adminPassword - 管理员密码
+ * @returns {Promise<boolean>}
+ */
 export async function checkAuth(cookie, adminPassword) {
   if (!cookie) return false;
   var match = cookie.match(/admin_token=([^;]+)/);
@@ -10,6 +16,10 @@ export async function checkAuth(cookie, adminPassword) {
   return match[1] === expected;
 }
 
+/**
+ * 生成管理员登录页面 HTML（完整版，无省略）
+ * @returns {string}
+ */
 export function getLoginPage() {
   return '<!DOCTYPE html>' +
   '<html lang="zh-CN">' +
@@ -55,4 +65,34 @@ export function getLoginPage() {
   '</script>' +
   '</body>' +
   '</html>';
+}
+
+/**
+ * 自动认证：如果未登录则返回登录页响应，否则返回 null
+ * @param {object} context - 包含 request, env
+ * @returns {Response|null} 如果未认证返回登录页 Response，否则返回 null
+ */
+export async function authenticateAdmin(context) {
+  const { request, env } = context;
+  const adminPassword = env.ADMIN_PASSWORD;
+
+  // 环境变量检查
+  if (!adminPassword) {
+    return new Response('请先在 Cloudflare 面板设置 ADMIN_PASSWORD 环境变量并重新部署', {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain; charset=UTF-8' }
+    });
+  }
+
+  const cookie = request.headers.get('Cookie');
+  const isAuth = await checkAuth(cookie, adminPassword);
+  if (!isAuth) {
+    // 未登录，返回登录页
+    return new Response(getLoginPage(), {
+      headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+    });
+  }
+
+  // 已登录，返回 null 表示通过认证
+  return null;
 }
