@@ -122,7 +122,7 @@ async function handlePost(context, pathParts) {
   }
   const action = body.action;
 
-  // ---- 操作：添加/删除用户（不需要路径中的 userId/platformId） ----
+  // ---- 操作：添加/删除/编辑用户（不需要路径中的 userId/platformId） ----
   if (action === 'addUser') {
     const uid = (body.userId || '').trim();
     const name = (body.displayName || '').trim();
@@ -133,12 +133,22 @@ async function handlePost(context, pathParts) {
     return jsonResponse({ success: true, message: '用户已添加' });
   }
 
-  if (action === 'deleteUser') {
+    if (action === 'deleteUser') {
     const uid = body.userId;
     if (!uid || !data.accounts[uid]) return jsonResponse({ error: '用户不存在' }, 404);
     delete data.accounts[uid];
     await saveDataToKV(env, data);
     return jsonResponse({ success: true, message: '用户已删除' });
+  }
+
+  if (action === 'updateUser') {
+    const uid = body.userId;
+    const name = (body.displayName || '').trim();
+    if (!uid || !data.accounts[uid]) return jsonResponse({ error: '用户不存在' }, 404);
+    if (!name) return jsonResponse({ error: '显示名称不能为空' }, 400);
+    data.accounts[uid].displayName = name;
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '用户已更新' });
   }
 
   // ---- 操作：添加/删除平台（仅需要 userId，不需要 platformId 路径） ----
@@ -154,7 +164,7 @@ async function handlePost(context, pathParts) {
     return jsonResponse({ success: true, message: '平台已添加' });
   }
 
-  if (action === 'deletePlatform') {
+    if (action === 'deletePlatform') {
     const uid = body.userId;
     const pid = body.platformId;
     if (!uid || !pid || !data.accounts[uid] || !data.accounts[uid].platforms[pid]) {
@@ -163,6 +173,19 @@ async function handlePost(context, pathParts) {
     delete data.accounts[uid].platforms[pid];
     await saveDataToKV(env, data);
     return jsonResponse({ success: true, message: '平台已删除' });
+  }
+
+  if (action === 'updatePlatform') {
+    const uid = body.userId;
+    const pid = body.platformId;
+    const name = (body.displayName || '').trim();
+    if (!uid || !pid || !data.accounts[uid] || !data.accounts[uid].platforms[pid]) {
+      return jsonResponse({ error: '用户或平台不存在' }, 404);
+    }
+    if (!name) return jsonResponse({ error: '显示名称不能为空' }, 400);
+    data.accounts[uid].platforms[pid].displayName = name;
+    await saveDataToKV(env, data);
+    return jsonResponse({ success: true, message: '平台已更新' });
   }
 
   // ---- 以下操作需要路径或 body 中的 userId/platformId ----
@@ -187,18 +210,23 @@ async function handlePost(context, pathParts) {
   try {
     switch (action) {
 
-      // ---------- 添加视频 ----------
+            // ---------- 添加视频 ----------
       case 'addVideo': {
         const title = (body.title || '').trim();
-        const imageUrl = (body.imageUrl || '').trim();
+        let imageUrl = (body.imageUrl || '').trim();
         const affiliateLink = (body.affiliateLink || '').trim();
-        if (!title || !imageUrl || !affiliateLink) {
-          return jsonResponse({ error: '标题、图片链接和推广链接不能为空' }, 400);
+        if (!title) {
+          return jsonResponse({ error: '标题不能为空' }, 400);
         }
 
         // 自动生成 8 位哈希 ID
         const existingIds = new Set(Object.keys(platform.videos));
         const newId = await generateVideoId(title, existingIds);
+
+        // 图片 URL 为空时自动填充占位图
+        if (!imageUrl) {
+          imageUrl = `https://picsum.photos/400/225?random=${newId}`;
+        }
 
         platform.videos[newId] = {
           id: newId,
@@ -208,6 +236,10 @@ async function handlePost(context, pathParts) {
           deleted: false,
           deletedAt: null
         };
+
+        // 更新 videoIndex
+        if (!data.videoIndex) data.videoIndex = {};
+        data.videoIndex[newId] = { userId, platformId };
 
         await saveDataToKV(env, data);
         return jsonResponse({ success: true, id: newId, message: '视频已添加' });
@@ -244,6 +276,8 @@ async function handlePost(context, pathParts) {
           return jsonResponse({ error: '视频不存在' }, 404);
         }
         delete platform.videos[videoId];
+        // 同步删除 videoIndex
+        if (data.videoIndex) delete data.videoIndex[videoId];
         await saveDataToKV(env, data);
         return jsonResponse({ success: true, message: '视频已永久删除' });
       }
@@ -255,16 +289,40 @@ async function handlePost(context, pathParts) {
           return jsonResponse({ error: '视频不存在' }, 404);
         }
         const title = (body.title || '').trim();
-        const imageUrl = (body.imageUrl || '').trim();
-        const affiliateLink = (body.affiliateLink || '').trim();
-        if (!title || !imageUrl || !affiliateLink) {
-          return jsonResponse({ error: '标题、图片链接和推广链接不能为空' }, 400);
-        }
+        if (!title) return jsonResponse({ error: '标题不能为空' }, 400);
         platform.videos[videoId].title = title;
-        platform.videos[videoId].imageUrl = imageUrl;
-        platform.videos[videoId].affiliateLink = affiliateLink;
+        // 图片 URL 留空时自动填充占位图
+        platform.videos[videoId].imageUrl = (body.imageUrl || '').trim() || `https://picsum.photos/400/225?random=${videoId}`;
+        platform.videos[videoId].affiliateLink = (body.affiliateLink || '').trim();
         await saveDataToKV(env, data);
         return jsonResponse({ success: true, message: '视频已更新' });
+      }
+
+      // ---------- 移动视频到其他用户/平台 ----------
+      case 'moveVideo': {
+        const videoId = body.videoId;
+        const targetUserId = (body.targetUserId || '').trim();
+        const targetPlatformId = (body.targetPlatformId || '').trim();
+        if (!videoId || !platform.videos[videoId]) {
+          return jsonResponse({ error: '视频不存在' }, 404);
+        }
+        if (!data.accounts[targetUserId] || !data.accounts[targetUserId].platforms[targetPlatformId]) {
+          return jsonResponse({ error: '目标用户或平台不存在' }, 404);
+        }
+        // 从原位置删除
+        const videoObj = platform.videos[videoId];
+        delete platform.videos[videoId];
+        // 添加到目标位置
+        const targetPlatform = data.accounts[targetUserId].platforms[targetPlatformId];
+        if (!targetPlatform.videos) targetPlatform.videos = {};
+        videoObj.deleted = false;
+        videoObj.deletedAt = null;
+        targetPlatform.videos[videoId] = videoObj;
+        // 更新 videoIndex
+        if (!data.videoIndex) data.videoIndex = {};
+        data.videoIndex[videoId] = { userId: targetUserId, platformId: targetPlatformId };
+        await saveDataToKV(env, data);
+        return jsonResponse({ success: true, message: '视频已迁移' });
       }
 
       default:

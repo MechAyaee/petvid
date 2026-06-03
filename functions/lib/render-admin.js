@@ -50,12 +50,15 @@ function renderUserList(data) {
             <h3><a href="/admin/${encodeURIComponent(uid)}">${escapeHtml(u.displayName)}</a></h3>
             <p>ID: ${escapeHtml(uid)}</p>
             <p>平台数: ${Object.keys(u.platforms || {}).length}</p>
+            <button class="btn" onclick="showEditUserModal('${escapeJsStr(uid)}','${escapeJsStr(u.displayName)}')">编辑</button>
             <button class="btn danger" onclick="deleteUser('${escapeJsStr(uid)}','${escapeJsStr(u.displayName)}')">删除</button>
           </div>
         `).join('')}
     </div>
     <!-- 添加用户模态框 -->
     ${addUserModal()}
+    <!-- 编辑用户模态框 -->
+    ${editUserModal()}
   `;
 
   const script = `
@@ -82,6 +85,25 @@ function renderUserList(data) {
       if (res.ok) { closeAddUserModal(); location.reload(); }
       else alert((await res.json()).error);
     }
+    function showEditUserModal(uid, name) {
+      document.getElementById('editUserId').value = uid;
+      document.getElementById('editUserIdDisplay').textContent = uid;
+      document.getElementById('editUserDisplayName').value = name;
+      document.getElementById('editUserModal').style.display = 'flex';
+    }
+    function closeEditUserModal() { document.getElementById('editUserModal').style.display = 'none'; }
+    async function saveEditUser() {
+      const uid = document.getElementById('editUserId').value;
+      const name = document.getElementById('editUserDisplayName').value.trim();
+      if (!name) { alert('显示名称不能为空'); return; }
+      const res = await fetch('/admin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action:'updateUser', userId: uid, displayName: name})
+      });
+      if (res.ok) { closeEditUserModal(); location.reload(); }
+      else alert((await res.json()).error);
+    }
   `;
   return adminPage(html, script);
 }
@@ -104,12 +126,15 @@ function renderPlatformList(data, userId) {
           <div class="card">
             <h3><a href="/admin/${encodeURIComponent(userId)}/${encodeURIComponent(pid)}">${escapeHtml(p.displayName)}</a></h3>
             <p>视频数: ${Object.keys(p.videos || {}).filter(vid => !p.videos[vid].deleted).length}</p>
+            <button class="btn" onclick="showEditPlatformModal('${escapeJsStr(pid)}','${escapeJsStr(p.displayName)}')">编辑</button>
             <button class="btn danger" onclick="deletePlatform('${escapeJsStr(userId)}','${escapeJsStr(pid)}','${escapeJsStr(p.displayName)}')">删除</button>
           </div>
         `).join('')}
     </div>
     <!-- 添加平台模态框 -->
     ${addPlatformModal()}
+    <!-- 编辑平台模态框 -->
+    ${editPlatformModal()}
   `;
 
   const script = `
@@ -135,6 +160,26 @@ function renderPlatformList(data, userId) {
         body: JSON.stringify({action:'addPlatform', userId: uid, platformId: pid, displayName: name})
       });
       if (res.ok) { closeAddPlatformModal(); location.reload(); }
+      else alert((await res.json()).error);
+    }
+    function showEditPlatformModal(pid, name) {
+      document.getElementById('editPlatformId').value = pid;
+      document.getElementById('editPlatformIdDisplay').textContent = pid;
+      document.getElementById('editPlatformDisplayName').value = name;
+      document.getElementById('editPlatformModal').style.display = 'flex';
+    }
+    function closeEditPlatformModal() { document.getElementById('editPlatformModal').style.display = 'none'; }
+    async function saveEditPlatform() {
+      const uid = '${escapeJsStr(userId)}';
+      const pid = document.getElementById('editPlatformId').value;
+      const name = document.getElementById('editPlatformDisplayName').value.trim();
+      if (!name) { alert('显示名称不能为空'); return; }
+      const res = await fetch('/admin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action:'updatePlatform', userId: uid, platformId: pid, displayName: name})
+      });
+      if (res.ok) { closeEditPlatformModal(); location.reload(); }
       else alert((await res.json()).error);
     }
   `;
@@ -163,17 +208,28 @@ function renderVideoList(data, userId, platformId) {
         ? '<p>暂无视频，点击上方按钮添加</p>'
         : Object.entries(activeVideos).map(([vid, v]) => videoCard(vid, v, userId, platformId, false)).join('')}
     </div>
-    <!-- 添加视频模态框（去掉视频ID输入） -->
-    ${videoModal(false)}
+    <!-- 添加/编辑视频模态框 -->
+    ${videoModal()}
+    <!-- 迁移视频模态框 -->
+    ${moveVideoModal(data, userId, platformId)}
   `;
 
+  // 前端所有可选的用户+平台选项（用于迁移选择器）
+  const allAccounts = Object.entries(data.accounts).map(([uid, u]) => ({
+    uid,
+    displayName: u.displayName,
+    platforms: Object.keys(u.platforms || {})
+  }));
+
   const script = `
+    const allAccounts = ${JSON.stringify(allAccounts)};
+
     function showAddVideoModal() {
       document.getElementById('modalTitle').innerText = '添加视频';
-      document.getElementById('modalVideoId').value = '';  // 隐藏字段，前端不再需要
+      document.getElementById('modalVideoId').value = '';
       document.getElementById('modalTitleInput').value = '';
       document.getElementById('modalImageUrlInput').value = '';
-      document.getElementById('modalAffiliateLinkInput').value = 'https://s.click.taobao.com/xxx';
+      document.getElementById('modalAffiliateLinkInput').value = '';
       document.getElementById('previewImage').style.display = 'none';
       document.getElementById('videoModal').style.display = 'flex';
     }
@@ -203,7 +259,7 @@ function renderVideoList(data, userId, platformId) {
         action,
         userId: '${escapeJsStr(userId)}',
         platformId: '${escapeJsStr(platformId)}',
-        videoId,  // 仅update时有效
+        videoId,
         title,
         imageUrl,
         affiliateLink
@@ -224,6 +280,45 @@ function renderVideoList(data, userId, platformId) {
         body: JSON.stringify({action:'deleteVideo', userId: '${escapeJsStr(userId)}', platformId: '${escapeJsStr(platformId)}', videoId: vid})
       });
       if (res.ok) location.reload(); else alert((await res.json()).error);
+    }
+
+    // ---- 迁移视频 ----
+    let moveVideoId = '';
+    function showMoveVideoModal(vid) {
+      moveVideoId = vid;
+      populateMoveUsers();
+      document.getElementById('moveVideoModal').style.display = 'flex';
+    }
+    function closeMoveVideoModal() { document.getElementById('moveVideoModal').style.display = 'none'; }
+    function populateMoveUsers() {
+      const sel = document.getElementById('moveTargetUserId');
+      sel.innerHTML = '<option value="">-- 选择用户 --</option>' + allAccounts.map(a => '<option value="' + a.uid + '">' + a.displayName + '</option>').join('');
+      document.getElementById('moveTargetPlatformId').innerHTML = '<option value="">-- 选择平台 --</option>';
+    }
+    function onMoveUserChange() {
+      const uid = document.getElementById('moveTargetUserId').value;
+      const sel = document.getElementById('moveTargetPlatformId');
+      const account = allAccounts.find(a => a.uid === uid);
+      sel.innerHTML = '<option value="">-- 选择平台 --</option>' + (account ? account.platforms.map(p => '<option value="' + p + '">' + p + '</option>').join('') : '');
+    }
+    async function saveMoveVideo() {
+      const targetUserId = document.getElementById('moveTargetUserId').value;
+      const targetPlatformId = document.getElementById('moveTargetPlatformId').value;
+      if (!targetUserId || !targetPlatformId) { alert('请选择目标用户和平台'); return; }
+      const res = await fetch('/admin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          action: 'moveVideo',
+          userId: '${escapeJsStr(userId)}',
+          platformId: '${escapeJsStr(platformId)}',
+          videoId: moveVideoId,
+          targetUserId,
+          targetPlatformId
+        })
+      });
+      if (res.ok) { closeMoveVideoModal(); location.reload(); }
+      else alert((await res.json()).error);
     }
   `;
   return adminPage(html, script);
@@ -298,9 +393,9 @@ function videoCard(vid, v, userId, platformId, deleted) {
     ? ''
     : `<div class="btn-group">
         <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')">编辑</button>
+        <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')">迁移</button>
         <button class="btn danger" onclick="deleteVideo('${escapeJsStr(vid)}')">移入回收站</button>
        </div>`;
-
   return `
     <div class="card video-card">
       <h3>${escapeHtml(v.title)} <small>(${escapeHtml(vid)})</small></h3>
@@ -318,12 +413,35 @@ function videoModal() {
         <h3 id="modalTitle">添加视频</h3>
         <input type="hidden" id="modalVideoId" />
         <div style="margin-bottom:12px;"><label>标题</label><input type="text" id="modalTitleInput" placeholder="请输入视频标题" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>
-        <div style="margin-bottom:12px;"><label>图片URL <span style="color:#999;">(可选)</span></label><input type="text" id="modalImageUrlInput" placeholder="https://example.com/thumbnail.jpg" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" oninput="previewImage()" /></div>
+        <div style="margin-bottom:12px;"><label>图片URL <span style="color:#999;">(留空自动填充占位图)</span></label><input type="text" id="modalImageUrlInput" placeholder="https://picsum.photos/400/225" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" oninput="previewImage()" /></div>
         <div style="margin-bottom:12px;" id="previewContainer"><img id="previewImage" style="max-width:200px; max-height:120px; display:none; border-radius:4px;" /></div>
         <div style="margin-bottom:12px;"><label>推广链接 <span style="color:#999;">(可选)</span></label><input type="text" id="modalAffiliateLinkInput" placeholder="https://s.click.taobao.com/xxx" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" /></div>
         <div style="text-align:right; margin-top:16px;">
           <button class="btn danger" onclick="closeModal()" style="margin-right:8px;">取消</button>
           <button class="btn" onclick="saveVideo()">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function moveVideoModal(data, currentUserId, currentPlatformId) {
+  return `
+    <div id="moveVideoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+      <div style="background:white; border-radius:8px; padding:24px; max-width:400px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+        <h3>迁移视频</h3>
+        <p style="margin-bottom:12px; color:#666;">选择目标用户和平台：</p>
+        <div style="margin-bottom:12px;">
+          <label>目标用户</label>
+          <select id="moveTargetUserId" onchange="onMoveUserChange()" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;"></select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label>目标平台</label>
+          <select id="moveTargetPlatformId" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;"></select>
+        </div>
+        <div style="text-align:right; margin-top:16px;">
+          <button class="btn danger" onclick="closeMoveVideoModal()" style="margin-right:8px;">取消</button>
+          <button class="btn" onclick="saveMoveVideo()">迁移</button>
         </div>
       </div>
     </div>
@@ -356,6 +474,40 @@ function addPlatformModal() {
         <div style="text-align:right; margin-top:16px;">
           <button class="btn danger" onclick="closeAddPlatformModal()" style="margin-right:8px;">取消</button>
           <button class="btn" onclick="savePlatform()">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function editUserModal() {
+  return `
+    <div id="editUserModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+      <div style="background:white; border-radius:8px; padding:24px; max-width:400px; width:90%;">
+        <h3>编辑用户</h3>
+        <input type="hidden" id="editUserId" />
+        <p>用户ID：<span id="editUserIdDisplay" style="font-weight:bold;"></span></p>
+        <input type="text" id="editUserDisplayName" placeholder="显示名称" style="width:100%; padding:8px; margin:8px 0; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" />
+        <div style="text-align:right; margin-top:16px;">
+          <button class="btn danger" onclick="closeEditUserModal()" style="margin-right:8px;">取消</button>
+          <button class="btn" onclick="saveEditUser()">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function editPlatformModal() {
+  return `
+    <div id="editPlatformModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+      <div style="background:white; border-radius:8px; padding:24px; max-width:400px; width:90%;">
+        <h3>编辑平台</h3>
+        <input type="hidden" id="editPlatformId" />
+        <p>平台ID：<span id="editPlatformIdDisplay" style="font-weight:bold;"></span></p>
+        <input type="text" id="editPlatformDisplayName" placeholder="显示名称" style="width:100%; padding:8px; margin:8px 0; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" />
+        <div style="text-align:right; margin-top:16px;">
+          <button class="btn danger" onclick="closeEditPlatformModal()" style="margin-right:8px;">取消</button>
+          <button class="btn" onclick="saveEditPlatform()">保存</button>
         </div>
       </div>
     </div>
