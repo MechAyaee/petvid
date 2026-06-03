@@ -40,9 +40,9 @@ function render404Page(msg) {
     <div class="error-page">
       <h1>404</h1>
       <p>${msg}</p>
-      <a href="/">返回首页</a>
+      <a href="/">Back to Home</a>
     </div>`;
-  return htmlTemplate('404 - 页面未找到', body);
+  return htmlTemplate('404 - Page Not Found', body);
 }
 
 // ---- 收集所有未删除的视频（用于公开首页） ----
@@ -119,7 +119,7 @@ export async function onRequest(context) {
     const hashId = pathParts[1];
     const videoRef = data.videoIndex && data.videoIndex[hashId];
     if (!videoRef) {
-      return new Response(render404Page(`视频未找到`), {
+      return new Response(render404Page(`Video not found`), {
         status: 404, headers: { 'Content-Type': 'text/html' }
       });
     }
@@ -127,7 +127,7 @@ export async function onRequest(context) {
     const platform = account?.platforms[videoRef.platformId];
     const video = platform?.videos[hashId];
     if (!video || video.deleted) {
-      return new Response(render404Page(`视频未找到`), {
+      return new Response(render404Page(`Video not found`), {
         status: 404, headers: { 'Content-Type': 'text/html' }
       });
     }
@@ -159,12 +159,12 @@ export async function onRequest(context) {
         headers: { Location: `/v/${hashId}` }
       });
     }
-    return new Response(render404Page('页面未找到'), {
+    return new Response(render404Page('Page Not Found'), {
       status: 404, headers: { 'Content-Type': 'text/html' }
     });
   }
 
-  return new Response(render404Page('页面未找到'), {
+  return new Response(render404Page('Page Not Found'), {
     status: 404, headers: { 'Content-Type': 'text/html' }
   });
 }
