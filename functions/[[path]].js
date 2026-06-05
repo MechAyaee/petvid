@@ -134,7 +134,7 @@ export async function onRequest(context) {
     const body = `
       <div class="video-page">
         <h1>${video.title}</h1>
-        <div id="ayaee">
+        <div id="zhicheng">
           <a href="${video.affiliateLink}" target="_blank" rel="noopener noreferrer">
             <img src="${video.imageUrl}" alt="${video.title}" style="max-width:100%; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
           </a>
