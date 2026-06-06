@@ -345,73 +345,7 @@ function renderVideoList(data, userId, platformId) {
       else alert((await res.json()).error);
     }
 
-    // ---- 复制单条链接 ----
-    window.copyVideoLink = function(vid) {
-      const url = 'https://petvid.pages.dev/v/' + vid;
-      const ta = document.createElement('textarea');
-      ta.value = url;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-        alert('链接已复制');
-      } catch(e) {
-        alert('复制失败，请手动复制: ' + url);
-      }
-      document.body.removeChild(ta);
-    };
-
-    // ---- 导出选中链接 ----
-    window.showExportModal = function() {
-      const checked = document.querySelectorAll('.video-checkbox');
-      const items = [];
-      checked.forEach(cb => {
-        if (!cb.checked) return;
-        items.push({
-          vid: cb.value,
-          title: cb.dataset.title || cb.value
-        });
-      });
-      if (items.length === 0) { alert('请先勾选要导出的视频'); return; }
-      renderExportModalContent(items);
-      document.getElementById('exportModal').style.display = 'flex';
-    };
-
-    function renderExportModalContent(items) {
-      const linkRows = items.map(item => {
-        const url = 'https://petvid.pages.dev/v/' + item.vid;
-        return '<div class="export-row">' +
-          '<div class="export-link">' + url + '</div>' +
-          '<div class="export-title">' + item.title + '</div>' +
-        '</div>';
-      }).join('');
-      document.getElementById('exportBody').innerHTML = linkRows;
-      document.getElementById('copyAllBtn').dataset.links = JSON.stringify(items.map(i => 'https://petvid.pages.dev/v/' + i.vid));
-    }
-
-    window.copyAllLinks = function() {
-      const btn = document.getElementById('copyAllBtn');
-      const links = JSON.parse(btn.dataset.links || '[]');
-      if (links.length === 0) return;
-      const text = links.join('\n');
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-        alert('已复制 ' + links.length + ' 条链接');
-      } catch(e) {
-        alert('复制失败，请手动选择复制');
-      }
-      document.body.removeChild(ta);
-    }
-
-    window.closeExportModal = function() { document.getElementById('exportModal').style.display = 'none'; }
+    // ---- 导出选中链接（函数定义在 exportLinksModal 的 script 标签中） ----
   `;
   return adminPage(html, script);
 }
@@ -628,6 +562,13 @@ function exportLinksModal() {
         </div>
       </div>
     </div>
+    <script>
+function copyVideoLink(vid){var url='https://petvid.pages.dev/v/'+vid;var ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');alert('链接已复制')}catch(e){alert('复制失败: '+url)}document.body.removeChild(ta)}
+function showExportModal(){var c=document.querySelectorAll('.video-checkbox');var items=[];c.forEach(function(cb){if(!cb.checked)return;items.push({vid:cb.value,title:cb.dataset.title||cb.value})});if(items.length===0){alert('请先勾选要导出的视频');return}renderExportModalContent(items);document.getElementById('exportModal').style.display='flex'}
+function renderExportModalContent(items){var rows=items.map(function(item){var url='https://petvid.pages.dev/v/'+item.vid;return'<div class=\"export-row\"><div class=\"export-link\">'+url+'</div><div class=\"export-title\">'+item.title.replace(/'/g,'\\\\u0027')+'</div></div>'});document.getElementById('exportBody').innerHTML=rows.join('');document.getElementById('copyAllBtn').dataset.links=JSON.stringify(items.map(function(i){return'https://petvid.pages.dev/v/'+i.vid}))}
+function copyAllLinks(){var btn=document.getElementById('copyAllBtn');var links=JSON.parse(btn.dataset.links||'[]');if(links.length===0)return;var text=links.join('\\n');var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');alert('已复制 '+links.length+' 条链接')}catch(e){alert('复制失败，请手动选择复制')}document.body.removeChild(ta)}
+function closeExportModal(){document.getElementById('exportModal').style.display='none'}
+    <\/script>
   `;
 }
 
