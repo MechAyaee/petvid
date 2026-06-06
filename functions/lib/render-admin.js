@@ -346,41 +346,38 @@ function renderVideoList(data, userId, platformId) {
     }
 
     // ---- 复制单条链接 ----
-    function copyVideoLink(vid) {
+    window.copyVideoLink = function(vid) {
       const url = 'https://petvid.pages.dev/v/' + vid;
-      navigator.clipboard.writeText(url).then(() => {
-        alert('链接已复制: ' + url);
-      }).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        document.body.appendChild(ta);
-        ta.select();
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
         document.execCommand('copy');
-        document.body.removeChild(ta);
-        alert('链接已复制: ' + url);
-      });
-    }
+        alert('链接已复制');
+      } catch(e) {
+        alert('复制失败，请手动复制: ' + url);
+      }
+      document.body.removeChild(ta);
+    };
 
     // ---- 导出选中链接 ----
-    function showExportModal() {
-      const checked = document.querySelectorAll('.video-checkbox:checked');
-      if (checked.length === 0) { alert('请先勾选要导出的视频'); return; }
+    window.showExportModal = function() {
+      const checked = document.querySelectorAll('.video-checkbox');
       const items = [];
       checked.forEach(cb => {
-        const vid = cb.value;
-        const card = cb.closest('.card');
-        const titleEl = card.querySelector('h3');
-        let title = vid;
-        if (titleEl) {
-          const text = titleEl.textContent || '';
-          const idx = text.lastIndexOf('(');
-          title = idx > 0 ? text.substring(0, idx).trim() : text.trim();
-        }
-        items.push({ vid, title });
+        if (!cb.checked) return;
+        items.push({
+          vid: cb.value,
+          title: cb.dataset.title || cb.value
+        });
       });
+      if (items.length === 0) { alert('请先勾选要导出的视频'); return; }
       renderExportModalContent(items);
       document.getElementById('exportModal').style.display = 'flex';
-    }
+    };
 
     function renderExportModalContent(items) {
       const linkRows = items.map(item => {
@@ -394,25 +391,27 @@ function renderVideoList(data, userId, platformId) {
       document.getElementById('copyAllBtn').dataset.links = JSON.stringify(items.map(i => 'https://petvid.pages.dev/v/' + i.vid));
     }
 
-    function copyAllLinks() {
+    window.copyAllLinks = function() {
       const btn = document.getElementById('copyAllBtn');
       const links = JSON.parse(btn.dataset.links || '[]');
       if (links.length === 0) return;
       const text = links.join('\n');
-      navigator.clipboard.writeText(text).then(() => {
-        alert('已复制 ' + links.length + ' 条链接');
-      }).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
         document.execCommand('copy');
-        document.body.removeChild(ta);
         alert('已复制 ' + links.length + ' 条链接');
-      });
+      } catch(e) {
+        alert('复制失败，请手动选择复制');
+      }
+      document.body.removeChild(ta);
     }
 
-    function closeExportModal() { document.getElementById('exportModal').style.display = 'none'; }
+    window.closeExportModal = function() { document.getElementById('exportModal').style.display = 'none'; }
   `;
   return adminPage(html, script);
 }
@@ -493,7 +492,7 @@ function videoCard(vid, v, userId, platformId, deleted) {
   return `
     <div class="card video-card">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-        ${deleted ? '' : `<input type="checkbox" class="video-checkbox" value="${escapeHtmlAttr(vid)}" style="flex-shrink:0;" />`}
+        ${deleted ? '' : `<input type="checkbox" class="video-checkbox" value="${escapeHtmlAttr(vid)}" data-title="${escapeHtmlAttr(v.title)}" style="flex-shrink:0;" />`}
         <h3 style="margin:0; flex:1;">${escapeHtml(v.title)} <small>(${escapeHtml(vid)})</small></h3>
       </div>
       ${imgHtml}
