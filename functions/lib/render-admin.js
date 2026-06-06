@@ -209,6 +209,7 @@ function renderVideoList(data, userId, platformId) {
         <button class="btn placeholder-btn" data-mode="random" onclick="setPlaceholderMode('random')" style="padding:4px 8px; font-size:13px;">🎲</button>
       </span>
       <button class="btn" onclick="showExportModal()" style="margin-left:auto;">导出选中</button>
+      <button class="btn" onclick="exportAll()" style="margin-left:8px;">导出全部</button>
     </div>
     <div class="card-grid">
       ${Object.keys(activeVideos).length === 0
@@ -568,6 +569,7 @@ function showExportModal(){var c=document.querySelectorAll('.video-checkbox');va
 function renderExportModalContent(items){var rows=items.map(function(item){var url='https://petvid.pages.dev/v/'+item.vid;return'<div class=\"export-row\"><div class=\"export-link\">'+url+'</div><div class=\"export-title\">'+item.title.replace(/'/g,'\\\\u0027')+'</div></div>'});document.getElementById('exportBody').innerHTML=rows.join('');document.getElementById('copyAllBtn').dataset.links=JSON.stringify(items.map(function(i){return'https://petvid.pages.dev/v/'+i.vid}))}
 function copyAllLinks(){var btn=document.getElementById('copyAllBtn');var links=JSON.parse(btn.dataset.links||'[]');if(links.length===0)return;var text=links.join('\\n');var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');alert('已复制 '+links.length+' 条链接')}catch(e){alert('复制失败，请手动选择复制')}document.body.removeChild(ta)}
 function closeExportModal(){document.getElementById('exportModal').style.display='none'}
+function exportAll(){var c=document.querySelectorAll('.video-checkbox');var items=[];c.forEach(function(cb){items.push({vid:cb.value,title:cb.dataset.title||cb.value})});if(items.length===0){alert('没有可导出的视频');return}renderExportModalContent(items);document.getElementById('exportModal').style.display='flex'}
     <\/script>
   `;
 }
