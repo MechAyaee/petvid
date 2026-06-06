@@ -330,6 +330,13 @@ function renderVideoList(data, userId, platformId) {
     let moveVideoId = '';
     function showMoveVideoModal(vid) {
       moveVideoId = vid;
+      if (vid === '_batch_') {
+        document.querySelector('#moveVideoModal h3').innerText = '批量迁移视频';
+        document.querySelector('#moveVideoModal p').innerText = '选择目标用户和平台，将选中的视频迁移过去：';
+      } else {
+        document.querySelector('#moveVideoModal h3').innerText = '迁移视频';
+        document.querySelector('#moveVideoModal p').innerText = '选择目标用户和平台：';
+      }
       populateMoveUsers();
       document.getElementById('moveVideoModal').style.display = 'flex';
     }
@@ -349,6 +356,34 @@ function renderVideoList(data, userId, platformId) {
       const targetUserId = document.getElementById('moveTargetUserId').value;
       const targetPlatformId = document.getElementById('moveTargetPlatformId').value;
       if (!targetUserId || !targetPlatformId) { alert('请选择目标用户和平台'); return; }
+      
+      // 批量迁移
+      if (moveVideoId === '_batch_') {
+        var ids = window._batchMoveIds || [];
+        if (ids.length === 0) { alert('没有要迁移的视频'); return; }
+        var done = 0;
+        var total = ids.length;
+        ids.forEach(function(vid) {
+          fetch('/admin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              action: 'moveVideo',
+              userId: '${escapeJsStr(userId)}',
+              platformId: '${escapeJsStr(platformId)}',
+              videoId: vid,
+              targetUserId,
+              targetPlatformId
+            })
+          }).then(function() {
+            done++;
+            if (done >= total) { closeMoveVideoModal(); location.reload(); }
+          });
+        });
+        return;
+      }
+      
+      // 单视频迁移（原有逻辑）
       const res = await fetch('/admin', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -592,10 +627,12 @@ function exportAll(){var c=document.querySelectorAll('.video-checkbox');var item
 function closeAllDropdowns(){var ds=['deleteDropdown','moveDropdown','exportDropdown'];ds.forEach(function(id){var d=document.getElementById(id);if(d)d.style.display='none'})}
 function toggleBatchDropdown(e,id){closeAllDropdowns();var d=document.getElementById(id);d.style.display=d.style.display==='block'?'none':'block';e.stopPropagation()}
 document.addEventListener('click',closeAllDropdowns)
-function batchDeleteSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要删除的视频');return}if(!confirm('确定将选中的 '+cbs.length+' 个视频移入回收站？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}))});Promise.all(p).then(function(){location.reload()})}
-function batchDeleteAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可删除的视频');return}if(!confirm('确定将该平台全部 '+cbs.length+' 个视频移入回收站？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}))});Promise.all(p).then(function(){location.reload()})}
-function batchMoveSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要迁移的视频');return}var m=prompt('请输入目标用户和平台，格式: 用户名/平台名\\n例如: zhangsan/tube');if(!m)return;var parts=m.split('/');if(parts.length!==2||!parts[0].trim()||!parts[1].trim()){alert('格式错误，请使用 用户名/平台名 格式');return}if(!confirm('确定将选中的 '+cbs.length+' 个视频迁移到 '+parts[0].trim()+'/'+parts[1].trim()+'？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'moveVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value,targetUserId:parts[0].trim(),targetPlatformId:parts[1].trim()})}))});Promise.all(p).then(function(){location.reload()})}
-function batchMoveAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可迁移的视频');return}var m=prompt('请输入目标用户和平台，格式: 用户名/平台名\\n例如: zhangsan/tube');if(!m)return;var parts=m.split('/');if(parts.length!==2||!parts[0].trim()||!parts[1].trim()){alert('格式错误，请使用 用户名/平台名 格式');return}if(!confirm('确定将该平台全部 '+cbs.length+' 个视频迁移到 '+parts[0].trim()+'/'+parts[1].trim()+'？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'moveVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value,targetUserId:parts[0].trim(),targetPlatformId:parts[1].trim()})}))});Promise.all(p).then(function(){location.reload()})}
+function batchDeleteSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要删除的视频');return}if(!confirm('确定将选中的 '+cbs.length+' 个视频移入回收站？'))return;var p=[];var done=0;var total=cbs.length;cbs.forEach(function(cb){fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}).then(function(){done++;if(done>=total)location.reload()})})}
+function batchDeleteAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可删除的视频');return}if(!confirm('确定将该平台全部 '+cbs.length+' 个视频移入回收站？'))return;var p=[];var done=0;var total=cbs.length;cbs.forEach(function(cb){fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}).then(function(){done++;if(done>=total)location.reload()})})}
+function batchMoveSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要迁移的视频');return}window._batchMoveIds=[];cbs.forEach(function(cb){window._batchMoveIds.push(cb.value)});showMoveVideoModal('_batch_')}
+function closeMoveVideoModal(){document.getElementById('moveVideoModal').style.display='none'}
+async function saveMoveVideo(){var targetUserId=document.getElementById('moveTargetUserId').value;var targetPlatformId=document.getElementById('moveTargetPlatformId').value;if(!targetUserId||!targetPlatformId){alert('请选择目标用户和平台');return}var ids=window._batchMoveIds||[];if(ids.length===0){alert('没有要迁移的视频');return}var done=0;var total=ids.length;ids.forEach(function(vid){fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'moveVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:vid,targetUserId:targetUserId,targetPlatformId:targetPlatformId})}).then(function(){done++;if(done>=total){closeMoveVideoModal();location.reload()}})})}
+function batchMoveAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可迁移的视频');return}window._batchMoveIds=[];cbs.forEach(function(cb){window._batchMoveIds.push(cb.value)});showMoveVideoModal('_batch_')}
     <\/script>
   `;
 }
