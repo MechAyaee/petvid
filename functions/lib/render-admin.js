@@ -239,7 +239,7 @@ function renderVideoList(data, userId, platformId) {
     ${videoModal()}
     <!-- 迁移视频模态框 -->
     ${moveVideoModal(data, userId, platformId)}
-    ${exportLinksModal()}
+    ${exportLinksModal(userId, platformId)}
   `;
 
   // 前端所有可选的用户+平台选项（用于迁移选择器）
@@ -564,7 +564,7 @@ function editPlatformModal() {
   `;
 }
 
-function exportLinksModal() {
+function exportLinksModal(userId, platformId) {
   return `
     <div id="exportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
       <div style="background:white; border-radius:8px; padding:24px; max-width:700px; width:90%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
