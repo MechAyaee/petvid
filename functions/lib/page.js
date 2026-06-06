@@ -26,12 +26,18 @@ export function adminPage(content, extraScript) {
       '.breadcrumb a { color:#007acc; text-decoration:none; }' +
       '.breadcrumb { margin-bottom:16px; }' +
       '.video-card .btn-group { margin-top:8px; }' +
+      '.export-row { display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #eee; font-size:13px; }' +
+      '.export-row:last-child { border-bottom:none; }' +
+      '.export-link { flex:1; word-break:break-all; color:#007acc; font-family:monospace; user-select:all; }' +
+      '.export-title { width:200px; flex-shrink:0; text-align:right; color:#666; padding-left:12px; }' +
+      '.video-checkbox { width:16px; height:16px; cursor:pointer; }' +
       '@media (max-width: 600px) {' +
         'body { padding:10px; }' +
         '.card-grid { grid-template-columns: 1fr; }' +
         '.card { padding:12px; }' +
         '.toolbar input { min-width:80px; }' +
         '.btn { font-size:12px; padding:4px 8px; }' +
+        '.export-title { width:120px; }' +
         '.admin-header h1 { font-size:20px; }' +
       '}' +
       '@media (max-width: 400px) {' +

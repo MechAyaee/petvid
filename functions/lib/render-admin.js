@@ -208,6 +208,7 @@ function renderVideoList(data, userId, platformId) {
         <button class="btn placeholder-btn" data-mode="dog" onclick="setPlaceholderMode('dog')" style="padding:4px 8px; font-size:13px;">🐶</button>
         <button class="btn placeholder-btn" data-mode="random" onclick="setPlaceholderMode('random')" style="padding:4px 8px; font-size:13px;">🎲</button>
       </span>
+      <button class="btn" onclick="showExportModal()" style="margin-left:auto;">导出选中</button>
     </div>
     <div class="card-grid">
       ${Object.keys(activeVideos).length === 0
@@ -218,6 +219,7 @@ function renderVideoList(data, userId, platformId) {
     ${videoModal()}
     <!-- 迁移视频模态框 -->
     ${moveVideoModal(data, userId, platformId)}
+    ${exportLinksModal()}
   `;
 
   // 前端所有可选的用户+平台选项（用于迁移选择器）
@@ -342,6 +344,75 @@ function renderVideoList(data, userId, platformId) {
       if (res.ok) { closeMoveVideoModal(); location.reload(); }
       else alert((await res.json()).error);
     }
+
+    // ---- 复制单条链接 ----
+    function copyVideoLink(vid) {
+      const url = 'https://petvid.pages.dev/v/' + vid;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('链接已复制: ' + url);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('链接已复制: ' + url);
+      });
+    }
+
+    // ---- 导出选中链接 ----
+    function showExportModal() {
+      const checked = document.querySelectorAll('.video-checkbox:checked');
+      if (checked.length === 0) { alert('请先勾选要导出的视频'); return; }
+      const items = [];
+      checked.forEach(cb => {
+        const vid = cb.value;
+        const card = cb.closest('.card');
+        const titleEl = card.querySelector('h3');
+        let title = vid;
+        if (titleEl) {
+          const text = titleEl.textContent || '';
+          const idx = text.lastIndexOf('(');
+          title = idx > 0 ? text.substring(0, idx).trim() : text.trim();
+        }
+        items.push({ vid, title });
+      });
+      renderExportModalContent(items);
+      document.getElementById('exportModal').style.display = 'flex';
+    }
+
+    function renderExportModalContent(items) {
+      const linkRows = items.map(item => {
+        const url = 'https://petvid.pages.dev/v/' + item.vid;
+        return '<div class="export-row">' +
+          '<div class="export-link">' + url + '</div>' +
+          '<div class="export-title">' + item.title + '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('exportBody').innerHTML = linkRows;
+      document.getElementById('copyAllBtn').dataset.links = JSON.stringify(items.map(i => 'https://petvid.pages.dev/v/' + i.vid));
+    }
+
+    function copyAllLinks() {
+      const btn = document.getElementById('copyAllBtn');
+      const links = JSON.parse(btn.dataset.links || '[]');
+      if (links.length === 0) return;
+      const text = links.join('\n');
+      navigator.clipboard.writeText(text).then(() => {
+        alert('已复制 ' + links.length + ' 条链接');
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('已复制 ' + links.length + ' 条链接');
+      });
+    }
+
+    function closeExportModal() { document.getElementById('exportModal').style.display = 'none'; }
   `;
   return adminPage(html, script);
 }
@@ -416,11 +487,15 @@ function videoCard(vid, v, userId, platformId, deleted) {
     : `<div class="btn-group">
         <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')">编辑</button>
         <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')">迁移</button>
+        <button class="btn" onclick="copyVideoLink('${escapeJsStr(vid)}')">复制链接</button>
         <button class="btn danger" onclick="deleteVideo('${escapeJsStr(vid)}')">移入回收站</button>
        </div>`;
   return `
     <div class="card video-card">
-      <h3>${escapeHtml(v.title)} <small>(${escapeHtml(vid)})</small></h3>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        ${deleted ? '' : `<input type="checkbox" class="video-checkbox" value="${escapeHtmlAttr(vid)}" style="flex-shrink:0;" />`}
+        <h3 style="margin:0; flex:1;">${escapeHtml(v.title)} <small>(${escapeHtml(vid)})</small></h3>
+      </div>
       ${imgHtml}
       <p><strong>推广链接：</strong>${linkHtml}</p>
       ${actions}
@@ -530,6 +605,27 @@ function editPlatformModal() {
         <div style="text-align:right; margin-top:16px;">
           <button class="btn danger" onclick="closeEditPlatformModal()" style="margin-right:8px;">取消</button>
           <button class="btn" onclick="saveEditPlatform()">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function exportLinksModal() {
+  return `
+    <div id="exportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+      <div style="background:white; border-radius:8px; padding:24px; max-width:700px; width:90%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-shrink:0;">
+          <h3 style="margin:0;">导出链接</h3>
+          <button id="copyAllBtn" class="btn" data-links="[]" onclick="copyAllLinks()" style="font-size:13px;">📋 复制全部链接</button>
+        </div>
+        <div style="display:flex; border-bottom:1px solid #ddd; padding-bottom:8px; margin-bottom:8px; font-weight:bold; font-size:13px; color:#555; flex-shrink:0;">
+          <div style="flex:1;">访问链接</div>
+          <div style="width:200px; flex-shrink:0; text-align:right;">视频标题</div>
+        </div>
+        <div id="exportBody" style="overflow-y:auto; flex:1; min-height:0;"></div>
+        <div style="text-align:right; margin-top:12px; flex-shrink:0;">
+          <button class="btn danger" onclick="closeExportModal()">关闭</button>
         </div>
       </div>
     </div>
