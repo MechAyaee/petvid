@@ -418,11 +418,11 @@ function videoCard(vid, v, userId, platformId, deleted) {
 
   const actions = deleted
     ? ''
-    : `<div class="btn-group">
-        <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')">编辑</button>
-        <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')">迁移</button>
-        <button class="btn" onclick="copyVideoLink('${escapeJsStr(vid)}')">复制链接</button>
-        <button class="btn danger" onclick="deleteVideo('${escapeJsStr(vid)}')">移入回收站</button>
+    : `<div class="btn-group" style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+        <button class="btn" onclick="copyVideoLink('${escapeJsStr(vid)}')" style="flex:1; padding:8px 12px; font-size:15px; font-weight:bold;">导出</button>
+        <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')" style="padding:8px 12px;">编辑</button>
+        <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')" style="padding:8px 12px;">迁移</button>
+        <button class="btn danger" onclick="deleteVideo('${escapeJsStr(vid)}')" style="padding:4px 8px; font-size:12px; opacity:0.7;">删除</button>
        </div>`;
   return `
     <div class="card video-card">
