@@ -208,8 +208,13 @@ function renderVideoList(data, userId, platformId) {
         <button class="btn placeholder-btn" data-mode="dog" onclick="setPlaceholderMode('dog')" style="padding:4px 8px; font-size:13px;">🐶</button>
         <button class="btn placeholder-btn" data-mode="random" onclick="setPlaceholderMode('random')" style="padding:4px 8px; font-size:13px;">🎲</button>
       </span>
-      <button class="btn" onclick="showExportModal()" style="margin-left:auto;">导出选中</button>
-      <button class="btn" onclick="exportAll()" style="margin-left:8px;">导出全部</button>
+      <div style="position:relative; display:inline-block; margin-left:auto;">
+        <button class="btn" onclick="toggleExportDropdown(event)" style="cursor:pointer;">导出 ▾</button>
+        <div id="exportDropdown" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:white; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:999; min-width:130px; overflow:hidden;">
+          <div onclick="showExportModal();document.getElementById('exportDropdown').style.display='none'" style="padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid #eee;">导出选中</div>
+          <div onclick="exportAll();document.getElementById('exportDropdown').style.display='none'" style="padding:10px 16px; cursor:pointer; font-size:14px;">导出全部</div>
+        </div>
+      </div>
     </div>
     <div class="card-grid">
       ${Object.keys(activeVideos).length === 0
@@ -570,6 +575,8 @@ function renderExportModalContent(items){var rows=items.map(function(item){var u
 function copyAllLinks(){var btn=document.getElementById('copyAllBtn');var links=JSON.parse(btn.dataset.links||'[]');if(links.length===0)return;var text=links.join('\\n');var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');alert('已复制 '+links.length+' 条链接')}catch(e){alert('复制失败，请手动选择复制')}document.body.removeChild(ta)}
 function closeExportModal(){document.getElementById('exportModal').style.display='none'}
 function exportAll(){var c=document.querySelectorAll('.video-checkbox');var items=[];c.forEach(function(cb){items.push({vid:cb.value,title:cb.dataset.title||cb.value})});if(items.length===0){alert('没有可导出的视频');return}renderExportModalContent(items);document.getElementById('exportModal').style.display='flex'}
+function toggleExportDropdown(e){var d=document.getElementById('exportDropdown');d.style.display=d.style.display==='block'?'none':'block';e.stopPropagation()}
+document.addEventListener('click',function(){var d=document.getElementById('exportDropdown');if(d)d.style.display='none'})
     <\/script>
   `;
 }
