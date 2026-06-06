@@ -209,10 +209,24 @@ function renderVideoList(data, userId, platformId) {
         <button class="btn placeholder-btn" data-mode="random" onclick="setPlaceholderMode('random')" style="padding:4px 8px; font-size:13px;">🎲</button>
       </span>
       <div style="position:relative; display:inline-block; margin-left:auto;">
-        <button class="btn" onclick="toggleExportDropdown(event)" style="cursor:pointer;">导出 ▾</button>
+        <button class="btn danger" onclick="toggleBatchDropdown(event,'deleteDropdown')" style="cursor:pointer;">删除 ▾</button>
+        <div id="deleteDropdown" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:white; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:999; min-width:130px; overflow:hidden;">
+          <div onclick="batchDeleteSelected();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid #eee;">删除选中</div>
+          <div onclick="batchDeleteAll();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px;">删除全部</div>
+        </div>
+      </div>
+      <div style="position:relative; display:inline-block;">
+        <button class="btn" onclick="toggleBatchDropdown(event,'moveDropdown')" style="cursor:pointer;">迁移 ▾</button>
+        <div id="moveDropdown" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:white; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:999; min-width:130px; overflow:hidden;">
+          <div onclick="batchMoveSelected();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid #eee;">迁移选中</div>
+          <div onclick="batchMoveAll();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px;">迁移全部</div>
+        </div>
+      </div>
+      <div style="position:relative; display:inline-block;">
+        <button class="btn" onclick="toggleBatchDropdown(event,'exportDropdown')" style="cursor:pointer;">导出 ▾</button>
         <div id="exportDropdown" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:white; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:999; min-width:130px; overflow:hidden;">
-          <div onclick="showExportModal();document.getElementById('exportDropdown').style.display='none'" style="padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid #eee;">导出选中</div>
-          <div onclick="exportAll();document.getElementById('exportDropdown').style.display='none'" style="padding:10px 16px; cursor:pointer; font-size:14px;">导出全部</div>
+          <div onclick="showExportModal();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid #eee;">导出选中</div>
+          <div onclick="exportAll();closeAllDropdowns()" style="padding:10px 16px; cursor:pointer; font-size:14px;">导出全部</div>
         </div>
       </div>
     </div>
@@ -424,10 +438,10 @@ function videoCard(vid, v, userId, platformId, deleted) {
   const actions = deleted
     ? ''
     : `<div class="btn-group" style="display:flex; gap:6px; margin-top:8px; align-items:center;">
-        <button class="btn" onclick="copyVideoLink('${escapeJsStr(vid)}')" style="flex:1; padding:8px 12px; font-size:15px; font-weight:bold;">导出</button>
-        <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')" style="padding:8px 12px;">编辑</button>
-        <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')" style="padding:8px 12px;">迁移</button>
         <button class="btn danger" onclick="deleteVideo('${escapeJsStr(vid)}')" style="padding:4px 8px; font-size:12px; opacity:0.7;">删除</button>
+        <button class="btn" onclick="showMoveVideoModal('${escapeJsStr(vid)}')" style="padding:8px 12px;">迁移</button>
+        <button class="btn" onclick="showEditVideoModal('${escapeJsStr(vid)}','${escapeJsStr(v.title)}','${escapeJsStr(v.imageUrl||'')}','${escapeJsStr(v.affiliateLink||'')}')" style="padding:8px 12px;">编辑</button>
+        <button class="btn" onclick="copyVideoLink('${escapeJsStr(vid)}')" style="flex:1; padding:8px 12px; font-size:15px; font-weight:bold;">导出</button>
        </div>`;
   return `
     <div class="card video-card">
@@ -575,8 +589,13 @@ function renderExportModalContent(items){var rows=items.map(function(item){var u
 function copyAllLinks(){var btn=document.getElementById('copyAllBtn');var links=JSON.parse(btn.dataset.links||'[]');if(links.length===0)return;var text=links.join('\\n');var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');alert('已复制 '+links.length+' 条链接')}catch(e){alert('复制失败，请手动选择复制')}document.body.removeChild(ta)}
 function closeExportModal(){document.getElementById('exportModal').style.display='none'}
 function exportAll(){var c=document.querySelectorAll('.video-checkbox');var items=[];c.forEach(function(cb){items.push({vid:cb.value,title:cb.dataset.title||cb.value})});if(items.length===0){alert('没有可导出的视频');return}renderExportModalContent(items);document.getElementById('exportModal').style.display='flex'}
-function toggleExportDropdown(e){var d=document.getElementById('exportDropdown');d.style.display=d.style.display==='block'?'none':'block';e.stopPropagation()}
-document.addEventListener('click',function(){var d=document.getElementById('exportDropdown');if(d)d.style.display='none'})
+function closeAllDropdowns(){var ds=['deleteDropdown','moveDropdown','exportDropdown'];ds.forEach(function(id){var d=document.getElementById(id);if(d)d.style.display='none'})}
+function toggleBatchDropdown(e,id){closeAllDropdowns();var d=document.getElementById(id);d.style.display=d.style.display==='block'?'none':'block';e.stopPropagation()}
+document.addEventListener('click',closeAllDropdowns)
+function batchDeleteSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要删除的视频');return}if(!confirm('确定将选中的 '+cbs.length+' 个视频移入回收站？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}))});Promise.all(p).then(function(){location.reload()})}
+function batchDeleteAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可删除的视频');return}if(!confirm('确定将该平台全部 '+cbs.length+' 个视频移入回收站？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'deleteVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value})}))});Promise.all(p).then(function(){location.reload()})}
+function batchMoveSelected(){var cbs=document.querySelectorAll('.video-checkbox:checked');if(cbs.length===0){alert('请先勾选要迁移的视频');return}var m=prompt('请输入目标用户和平台，格式: 用户名/平台名\\n例如: zhangsan/tube');if(!m)return;var parts=m.split('/');if(parts.length!==2||!parts[0].trim()||!parts[1].trim()){alert('格式错误，请使用 用户名/平台名 格式');return}if(!confirm('确定将选中的 '+cbs.length+' 个视频迁移到 '+parts[0].trim()+'/'+parts[1].trim()+'？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'moveVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value,targetUserId:parts[0].trim(),targetPlatformId:parts[1].trim()})}))});Promise.all(p).then(function(){location.reload()})}
+function batchMoveAll(){var cbs=document.querySelectorAll('.video-checkbox');if(cbs.length===0){alert('没有可迁移的视频');return}var m=prompt('请输入目标用户和平台，格式: 用户名/平台名\\n例如: zhangsan/tube');if(!m)return;var parts=m.split('/');if(parts.length!==2||!parts[0].trim()||!parts[1].trim()){alert('格式错误，请使用 用户名/平台名 格式');return}if(!confirm('确定将该平台全部 '+cbs.length+' 个视频迁移到 '+parts[0].trim()+'/'+parts[1].trim()+'？'))return;var p=[];cbs.forEach(function(cb){p.push(fetch('/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'moveVideo',userId:'${escapeJsStr(userId)}',platformId:'${escapeJsStr(platformId)}',videoId:cb.value,targetUserId:parts[0].trim(),targetPlatformId:parts[1].trim()})}))});Promise.all(p).then(function(){location.reload()})}
     <\/script>
   `;
 }
